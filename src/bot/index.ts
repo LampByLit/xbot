@@ -2,7 +2,8 @@ import dotenv from 'dotenv'
 import { botLogger, checkLoggerHealth } from './utils/logger'
 import twitterClient from './core/twitter-client'
 import deepseekClient from './core/deepseek-client'
-import { BOT_CONFIG } from '@/shared/constants'
+import configManager from './config/bot-config'
+import systemPromptsManager from './config/system-prompts'
 
 // Load environment variables
 dotenv.config()
@@ -47,7 +48,8 @@ class XBot {
       }
 
       // Check bot configuration
-      if (!BOT_CONFIG.ENABLED) {
+      const config = configManager.getConfig()
+      if (!config.enabled) {
         botLogger.warn('Bot is disabled in configuration')
       }
 
@@ -85,9 +87,10 @@ class XBot {
     botLogger.info('XBot started successfully', {
       startTime: this.startTime.toISOString(),
       config: {
-        username: BOT_CONFIG.USERNAME,
-        hashtag: BOT_CONFIG.HASHTAG,
-        enabled: BOT_CONFIG.ENABLED
+        username: config.username,
+        hashtag: config.hashtag,
+        enabled: config.enabled,
+        activePrompts: systemPromptsManager.getActivePromptModules().length
       }
     })
   }
@@ -119,6 +122,7 @@ class XBot {
     uptime: number
     twitterStatus: any
     deepseekStatus: any
+    configStatus: any
   } {
     const uptime = this.startTime ? Date.now() - this.startTime.getTime() : 0
     
@@ -127,7 +131,11 @@ class XBot {
       startTime: this.startTime?.toISOString() || null,
       uptime,
       twitterStatus: twitterClient.getAuthStatus(),
-      deepseekStatus: deepseekClient.getConnectionStatus()
+      deepseekStatus: deepseekClient.getConnectionStatus(),
+      configStatus: {
+        config: configManager.getHealthStatus(),
+        prompts: systemPromptsManager.getPromptStatistics()
+      }
     }
   }
 
