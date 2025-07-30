@@ -1,0 +1,499 @@
+# XBot - Twitter Bot Development Rules
+
+## Project Overview
+This is a Twitter bot that integrates with X.com API v1.1 and DeepSeek API to automatically reply to users who mention @recapitul8r and use the #hey hashtag. The bot features modular system prompts, whitelist management, and a password-protected web interface for configuration.
+
+## Technology Stack
+- **Backend**: Node.js with TypeScript
+- **Frontend**: Next.js with React for management interface
+- **Deployment**: Railway with persistent volume storage at `/data`
+- **APIs**: X.com API v1.1, DeepSeek Chat Completion API
+- **Storage**: Railway persistent volume (JSON files for configuration)
+- **Authentication**: Simple password protection via environment variable
+
+## Project Structure
+```
+xbot/
+├── src/
+│   ├── bot/
+│   │   ├── core/
+│   │   │   ├── twitter-client.ts
+│   │   │   ├── deepseek-client.ts
+│   │   │   ├── stream-handler.ts
+│   │   │   └── response-generator.ts
+│   │   ├── config/
+│   │   │   ├── bot-config.ts
+│   │   │   ├── system-prompts.ts
+│   │   │   └── whitelist.ts
+│   │   ├── types/
+│   │   │   ├── twitter-types.ts
+│   │   │   ├── deepseek-types.ts
+│   │   │   └── bot-types.ts
+│   │   └── utils/
+│   │       ├── logger.ts
+│   │       ├── rate-limiter.ts
+│   │       └── text-processor.ts
+│   ├── web/
+│   │   ├── app/
+│   │   │   ├── page.tsx
+│   │   │   ├── layout.tsx
+│   │   │   └── globals.css
+│   │   ├── components/
+│   │   │   ├── auth/
+│   │   │   ├── config/
+│   │   │   └── ui/
+│   │   └── api/
+│   │       ├── auth/
+│   │       └── config/
+│   └── shared/
+│       ├── constants.ts
+│       └── utils.ts
+├── data/
+│   ├── config.json
+│   ├── whitelist.json
+│   └── logs/
+├── public/
+├── package.json
+├── tsconfig.json
+├── next.config.js
+├── tailwind.config.js
+├── .env.example
+└── README.md
+```
+
+## Core Development Principles
+
+### TypeScript Usage
+- Use TypeScript for all code with strict type checking
+- Prefer interfaces over types for API responses and data structures
+- Use descriptive type names (e.g., `TwitterMention`, `BotResponse`, `SystemPrompt`)
+- Avoid `any` type; use `unknown` when type is truly unknown
+
+### API Integration Patterns
+- **X.com API v1.1**: Use for posting tweets, reading mentions, and user lookups
+- **DeepSeek API**: Use for generating contextual responses based on system prompts
+- Implement proper error handling and retry logic for both APIs
+- Use environment variables for all API keys and sensitive data
+
+### Bot Architecture
+- **Modular System Prompts**: Enable/disable different behavior modules
+- **Whitelist Management**: Toggle between open replies and whitelist-only mode
+- **Rate Limiting**: Implement per-API rate limiting to avoid quota issues
+- **Stream Processing**: Use filtered stream to monitor mentions in real-time
+
+### Configuration Management
+- Store configuration in `/data/config.json` for persistence across deployments
+- Use environment variables for sensitive configuration (API keys, passwords)
+- Implement configuration validation with Zod schemas
+- Provide web interface for non-sensitive configuration changes
+
+## Code Style and Structure
+
+### File Organization
+- Group related functionality in modules (twitter, deepseek, config, etc.)
+- Use barrel exports (index.ts) for clean imports
+- Keep utility functions separate from business logic
+- Place types and interfaces in dedicated type files
+
+### Naming Conventions
+- Use camelCase for variables and functions
+- Use PascalCase for classes and interfaces
+- Use kebab-case for file names
+- Use UPPER_SNAKE_CASE for constants
+- Use descriptive names with auxiliary verbs for booleans (isEnabled, hasError)
+
+### Error Handling
+- Use early returns and guard clauses
+- Implement proper error logging with context
+- Create custom error types for different failure scenarios
+- Handle API rate limits gracefully with exponential backoff
+
+## API Integration Guidelines
+
+### X.com API v1.1
+```typescript
+// Example Twitter client structure
+interface TwitterClient {
+  postTweet(text: string): Promise<TweetResponse>
+  getMentions(): Promise<Mention[]>
+  getUserInfo(username: string): Promise<UserInfo>
+  searchTweets(query: string): Promise<Tweet[]>
+}
+```
+
+### DeepSeek API
+```typescript
+// Example DeepSeek client structure
+interface DeepSeekClient {
+  generateResponse(
+    systemPrompt: string,
+    userMessage: string,
+    context?: string
+  ): Promise<string>
+}
+```
+
+### Rate Limiting
+- Implement per-endpoint rate limiting
+- Use token bucket algorithm for fair distribution
+- Log rate limit events for monitoring
+- Implement exponential backoff for retries
+
+## Web Interface Guidelines
+
+### Authentication
+- Simple password protection via environment variable
+- Session-based authentication with secure cookies
+- Implement logout functionality
+- Use middleware for route protection
+
+### Configuration Interface
+- Toggle whitelist on/off
+- Enable/disable system prompt modules
+- View bot status and recent activity
+- Configure rate limiting settings
+- View logs and error messages
+
+### UI/UX
+- Use Shadcn UI components for consistent design
+- Implement responsive design with Tailwind CSS
+- Use loading states for async operations
+- Provide clear feedback for configuration changes
+
+## Logging and Monitoring
+
+### Logging Strategy
+- Use structured logging with different levels (info, warn, error)
+- Log API calls, responses, and errors
+- Include context information (user IDs, tweet IDs, etc.)
+- Rotate logs to prevent disk space issues
+
+### Monitoring
+- Track API usage and rate limits
+- Monitor bot response times
+- Alert on repeated failures
+- Track whitelist changes and configuration updates
+
+## Development Workflow
+
+### Local Development
+- Use environment variables for local configuration
+- Implement hot reloading for development
+- Use TypeScript strict mode
+- Run linting and type checking before commits
+
+### Deployment
+- Use Railway for hosting with persistent storage
+- Store configuration in `/data` directory
+- Use environment variables for production secrets
+- Implement health checks for monitoring
+
+## Security Considerations
+
+### API Security
+- Store API keys in environment variables only
+- Implement proper input validation
+- Sanitize user inputs before processing
+- Use HTTPS for all external communications
+
+### Web Interface Security
+- Implement CSRF protection
+- Use secure session management
+- Validate all configuration inputs
+- Implement proper error handling without exposing sensitive data
+
+## Testing Strategy
+
+### Unit Testing
+- Test utility functions and API clients
+- Mock external API calls
+- Test configuration validation
+- Test rate limiting logic
+
+### Integration Testing
+- Test bot response generation
+- Test Twitter API integration
+- Test web interface functionality
+- Test configuration persistence
+
+## Performance Optimization
+
+### API Efficiency
+- Implement connection pooling for API clients
+- Use streaming for large data sets
+- Cache frequently accessed data
+- Implement proper timeout handling
+
+### Memory Management
+- Avoid memory leaks in long-running processes
+- Implement proper cleanup for event listeners
+- Use streaming for log processing
+- Monitor memory usage in production
+
+## Documentation Standards
+
+### Code Documentation
+- Use JSDoc for public functions and interfaces
+- Document complex business logic
+- Include examples for API usage
+- Document configuration options
+
+### API Documentation
+- Document all environment variables
+- Provide setup instructions
+- Include troubleshooting guide
+- Document deployment process
+
+## Error Handling Patterns
+
+### API Error Handling
+```typescript
+// Example error handling pattern
+try {
+  const response = await twitterClient.postTweet(text)
+  return response
+} catch (error) {
+  if (error.statusCode === 429) {
+    // Handle rate limiting
+    await handleRateLimit(error)
+  } else if (error.statusCode === 403) {
+    // Handle authentication issues
+    logger.error('Authentication failed', { error })
+  } else {
+    // Handle other errors
+    logger.error('Unexpected error', { error })
+  }
+  throw error
+}
+```
+
+### Configuration Validation
+```typescript
+// Example configuration validation
+const configSchema = z.object({
+  whitelistEnabled: z.boolean(),
+  systemPrompts: z.record(z.boolean()),
+  rateLimits: z.object({
+    twitter: z.number(),
+    deepseek: z.number()
+  })
+})
+```
+
+## Best Practices
+
+### Code Quality
+- Use ESLint and Prettier for consistent formatting
+- Implement pre-commit hooks for code quality
+- Use TypeScript strict mode
+- Follow single responsibility principle
+
+### API Integration
+- Implement proper retry logic with exponential backoff
+- Use connection pooling for efficiency
+- Implement proper timeout handling
+- Log all API interactions for debugging
+
+### Configuration Management
+- Validate all configuration inputs
+- Provide sensible defaults
+- Use environment-specific configuration
+- Implement configuration hot-reloading
+
+### Monitoring and Observability
+- Implement structured logging
+- Track key metrics (response times, error rates)
+- Set up alerts for critical failures
+- Monitor API quota usage
+
+## Migration and Deployment
+
+### Environment Setup
+- Use `.env.example` for required environment variables
+- Implement configuration validation on startup
+- Provide clear setup instructions
+- Use Docker for consistent environments
+
+### Database Migration
+- Use JSON files for simple data storage
+- Implement backup strategies for configuration
+- Version configuration schemas
+- Provide migration scripts for schema changes
+
+## Community and Collaboration
+
+### Code Review
+- Review all changes before merging
+- Test configuration changes thoroughly
+- Validate API integrations
+- Ensure proper error handling
+
+### Documentation
+- Keep README up to date
+- Document API changes
+- Provide troubleshooting guides
+- Include setup instructions
+
+---
+
+You are an expert in TypeScript, Node.js, Next.js App Router, React, Shadcn UI, Radix UI and Tailwind.
+
+Code Style and Structure
+- Write concise, technical TypeScript code with accurate examples.
+- Use functional and declarative programming patterns; avoid classes.
+- Prefer iteration and modularization over code duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
+- Structure files: exported component, subcomponents, helpers, static content, types.
+
+Naming Conventions
+- Use lowercase with dashes for directories (e.g., components/auth-wizard).
+- Favor named exports for components.
+
+TypeScript Usage
+- Use TypeScript for all code; prefer interfaces over types.
+- Avoid enums; use maps instead.
+- Use functional components with TypeScript interfaces.
+
+Syntax and Formatting
+- Use the "function" keyword for pure functions.
+- Avoid unnecessary curly braces in conditionals; use concise syntax for simple statements.
+- Use declarative JSX.
+
+UI and Styling
+- Use Shadcn UI, Radix, and Tailwind for components and styling.
+- Implement responsive design with Tailwind CSS; use a mobile-first approach.
+
+Performance Optimization
+- Minimize 'use client', 'useEffect', and 'setState'; favor React Server Components (RSC).
+- Wrap client components in Suspense with fallback.
+- Use dynamic loading for non-critical components.
+- Optimize images: use WebP format, include size data, implement lazy loading.
+
+Key Conventions
+- Use 'nuqs' for URL search parameter state management.
+- Optimize Web Vitals (LCP, CLS, FID).
+- Limit 'use client':
+  - Favor server components and Next.js SSR.
+  - Use only for Web API access in small components.
+  - Avoid for data fetching or state management.
+
+Follow Next.js docs for Data Fetching, Rendering, and Routing.
+
+You are an expert developer in TypeScript, Node.js, Next.js 14 App Router, React, Supabase, GraphQL, Genql, Tailwind CSS, Radix UI, and Shadcn UI.
+
+Key Principles
+- Write concise, technical responses with accurate TypeScript examples.
+- Use functional, declarative programming. Avoid classes.
+- Prefer iteration and modularization over duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
+- Use lowercase with dashes for directories (e.g., components/auth-wizard).
+- Favor named exports for components.
+- Use the Receive an Object, Return an Object (RORO) pattern.
+
+JavaScript/TypeScript
+- Use "function" keyword for pure functions. Omit semicolons.
+- Use TypeScript for all code. Prefer interfaces over types.
+- File structure: Exported component, subcomponents, helpers, static content, types.
+- Avoid unnecessary curly braces in conditional statements.
+- For single-line statements in conditionals, omit curly braces.
+- Use concise, one-line syntax for simple conditional statements (e.g., if (condition) doSomething()).
+
+Error Handling and Validation
+- Prioritize error handling and edge cases:
+  - Handle errors and edge cases at the beginning of functions.
+  - Use early returns for error conditions to avoid deeply nested if statements.
+  - Place the happy path last in the function for improved readability.
+  - Avoid unnecessary else statements; use if-return pattern instead.
+  - Use guard clauses to handle preconditions and invalid states early.
+  - Implement proper error logging and user-friendly error messages.
+  - Consider using custom error types or error factories for consistent error handling.
+
+AI SDK
+- Use the Vercel AI SDK UI for implementing streaming chat UI.
+- Use the Vercel AI SDK Core to interact with language models.
+- Use the Vercel AI SDK RSC and Stream Helpers to stream and help with the generations.
+- Implement proper error handling for AI responses and model switching.
+- Implement fallback mechanisms for when an AI model is unavailable.
+- Handle rate limiting and quota exceeded scenarios gracefully.
+- Provide clear error messages to users when AI interactions fail.
+- Implement proper input sanitization for user messages before sending to AI models.
+- Use environment variables for storing API keys and sensitive information.
+
+React/Next.js
+- Use functional components and TypeScript interfaces.
+- Use declarative JSX.
+- Use function, not const, for components.
+- Use Shadcn UI, Radix, and Tailwind CSS for components and styling.
+- Implement responsive design with Tailwind CSS.
+- Use mobile-first approach for responsive design.
+- Place static content and interfaces at file end.
+- Use content variables for static content outside render functions.
+- Minimize 'use client', 'useEffect', and 'setState'. Favor React Server Components (RSC).
+- Use Zod for form validation.
+- Wrap client components in Suspense with fallback.
+- Use dynamic loading for non-critical components.
+- Optimize images: WebP format, size data, lazy loading.
+- Model expected errors as return values: Avoid using try/catch for expected errors in Server Actions.
+- Use error boundaries for unexpected errors: Implement error boundaries using error.tsx and global-error.tsx files.
+- Use useActionState with react-hook-form for form validation.
+- Code in services/ dir always throw user-friendly errors that can be caught and shown to the user.
+- Use next-safe-action for all server actions.
+- Implement type-safe server actions with proper validation.
+- Handle errors gracefully and return appropriate responses.
+
+Key Conventions
+1. Rely on Next.js App Router for state changes and routing.
+2. Prioritize Web Vitals (LCP, CLS, FID).
+3. Minimize 'use client' usage:
+   - Prefer server components and Next.js SSR features.
+   - Use 'use client' only for Web API access in small components.
+   - Avoid using 'use client' for data fetching or state management.
+4. Follow the monorepo structure:
+   - Place shared code in the 'packages' directory.
+   - Keep app-specific code in the 'apps' directory.
+5. Use Taskfile commands for development and deployment tasks.
+6. Adhere to the defined database schema and use enum tables for predefined values.
+
+Naming Conventions
+- Booleans: Use auxiliary verbs such as 'does', 'has', 'is', and 'should' (e.g., isDisabled, hasError).
+- Filenames: Use lowercase with dash separators (e.g., auth-wizard.tsx).
+- File extensions: Use .config.ts, .test.ts, .context.tsx, .type.ts, .hook.ts as appropriate.
+
+Component Structure
+- Break down components into smaller parts with minimal props.
+- Suggest micro folder structure for components.
+- Use composition to build complex components.
+- Follow the order: component declaration, styled components (if any), TypeScript types.
+
+Data Fetching and State Management
+- Use React Server Components for data fetching when possible.
+- Implement the preload pattern to prevent waterfalls.
+- Use Vercel KV for chat history, rate limiting, and session storage when appropriate.
+
+Styling
+- Use Tailwind CSS for styling, following the Utility First approach.
+- Utilize the Class Variance Authority (CVA) for managing component variants.
+
+Testing
+- Implement unit tests for utility functions and hooks.
+- Use integration tests for complex components and pages.
+- Implement end-to-end tests for critical user flows.
+
+Accessibility
+- Ensure interfaces are keyboard navigable.
+- Implement proper ARIA labels and roles for components.
+- Ensure color contrast ratios meet WCAG standards for readability.
+
+Documentation
+- Provide clear and concise comments for complex logic.
+- Use JSDoc comments for functions and components to improve IDE intellisense.
+- Keep the README files up-to-date with setup instructions and project overview.
+
+Refer to Next.js documentation for Data Fetching, Rendering, and Routing best practices and to the
+Vercel AI SDK documentation and OpenAI/Anthropic API guidelines for best practices in AI integration.
+    
+
+    
+    
+
+    
