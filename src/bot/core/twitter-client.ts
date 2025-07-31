@@ -82,17 +82,29 @@ class TwitterClient {
       this.axiosInstance.interceptors.request.use(
         (config) => {
           if (config.url && config.method && !config.url.includes('oauth')) {
+            const config_obj = this.getConfig()
+            
+            // Create OAuth request data
             const request_data = {
               url: config.url,
               method: config.method.toUpperCase()
             }
 
-            const token = {
-              key: this.getConfig().accessToken,
-              secret: this.getConfig().accessTokenSecret
+            // Add query parameters to OAuth signature if they exist
+            if (config.params) {
+              request_data.url += '?' + new URLSearchParams(config.params).toString()
             }
 
-            const authHeader = this.getOAuth().toHeader(this.getOAuth().authorize(request_data, token))
+            const token = {
+              key: config_obj.accessToken,
+              secret: config_obj.accessTokenSecret
+            }
+
+            // Generate OAuth signature
+            const oauth = this.getOAuth()
+            const authHeader = oauth.toHeader(oauth.authorize(request_data, token))
+            
+            // Apply OAuth headers
             if (config.headers) {
               Object.assign(config.headers, authHeader)
             }
@@ -132,9 +144,14 @@ class TwitterClient {
    */
   async testConnection(): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await this.getUserInfo('recapitul8r')
+      // Test by posting a simple tweet using v2 API
+      const testTweet: TwitterPostRequest = {
+        status: '🤖 XBot test - ' + new Date().toISOString()
+      }
+      
+      const response = await this.postTweet(testTweet)
       this.isAuthenticated = true
-      botLogger.info('Twitter API connection test successful')
+      botLogger.info('Twitter API connection test successful', { tweetId: response.id_str })
       return { success: true }
     } catch (error: any) {
       this.isAuthenticated = false
@@ -151,22 +168,45 @@ class TwitterClient {
     await twitterRateLimiter.waitForPost()
 
     try {
-      botLogger.apiRequest('twitter', 'statuses/update', {
+      botLogger.apiRequest('twitter', 'tweets', {
         text: request.status.substring(0, 50) + '...',
         inReplyTo: request.in_reply_to_status_id
       })
 
-      const response: AxiosResponse<TwitterPostResponse> = await this.getAxiosInstance().post(
-        `${API_ENDPOINTS.TWITTER.BASE_URL}/statuses/update.json`,
-        request
+      const config = this.getConfig()
+      const response: AxiosResponse<any> = await axios.post(
+        `${API_ENDPOINTS.TWITTER.BASE_URL}/tweets`,
+        {
+          text: request.status,
+          ...(request.in_reply_to_status_id && { reply: { in_reply_to_tweet_id: request.in_reply_to_status_id } })
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'XBot/1.0.0',
+            ...this.getOAuth().toHeader(this.getOAuth().authorize({
+              url: `${API_ENDPOINTS.TWITTER.BASE_URL}/tweets`,
+              method: 'POST'
+            }, {
+              key: config.accessToken,
+              secret: config.accessTokenSecret
+            }))
+          }
+        }
       )
 
       botLogger.info('Tweet posted successfully', {
-        tweetId: response.data.id_str,
-        text: response.data.text.substring(0, 100)
+        tweetId: response.data.data.id,
+        text: response.data.data.text.substring(0, 100)
       })
 
-      return response.data
+      // Convert v2 response to v1.1 format for compatibility
+      return {
+        id_str: response.data.data.id,
+        text: response.data.data.text,
+        created_at: response.data.data.created_at,
+        user: response.data.includes?.users?.[0] || {}
+      }
     } catch (error: any) {
       const twitterError = this.handleTwitterError(error)
       throw twitterError
@@ -193,22 +233,46 @@ class TwitterClient {
     await twitterRateLimiter.waitForSearch()
 
     try {
-      const params: any = { count }
+      const params: any = { 
+        'max_results': count,
+        'tweet.fields': 'created_at,author_id,text',
+        'user.fields': 'username,name',
+        'expansions': 'author_id'
+      }
       if (sinceId) params.since_id = sinceId
 
-      botLogger.apiRequest('twitter', 'statuses/mentions_timeline', { count, sinceId })
+      botLogger.apiRequest('twitter', 'users/me/mentions', { count, sinceId })
 
-      const response: AxiosResponse<TwitterMention[]> = await this.getAxiosInstance().get(
-        `${API_ENDPOINTS.TWITTER.BASE_URL}/statuses/mentions_timeline.json`,
-        { params }
+      const config = this.getConfig()
+      const response: AxiosResponse<any> = await axios.get(
+        `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me/mentions`,
+        { 
+          params,
+          headers: {
+            'User-Agent': 'XBot/1.0.0',
+            ...this.getOAuth().toHeader(this.getOAuth().authorize({
+              url: `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me/mentions`,
+              method: 'GET'
+            }, {
+              key: config.accessToken,
+              secret: config.accessTokenSecret
+            }))
+          }
+        }
       )
 
       botLogger.info('Mentions retrieved', {
-        count: response.data.length,
+        count: response.data.data?.length || 0,
         sinceId
       })
 
-      return response.data
+      // Convert v2 response to v1.1 format for compatibility
+      return (response.data.data || []).map((tweet: any) => ({
+        id_str: tweet.id,
+        text: tweet.text,
+        created_at: tweet.created_at,
+        user: response.data.includes?.users?.find((u: any) => u.id === tweet.author_id) || {}
+      }))
     } catch (error: any) {
       const twitterError = this.handleTwitterError(error)
       throw twitterError
@@ -251,9 +315,17 @@ class TwitterClient {
     try {
       botLogger.apiRequest('twitter', 'users/show', { username })
 
-      const response: AxiosResponse<TwitterUser> = await this.getAxiosInstance().get(
+      // Use Bearer token for user lookup (more reliable than OAuth for this endpoint)
+      const config = this.getConfig()
+      const response: AxiosResponse<TwitterUser> = await axios.get(
         `${API_ENDPOINTS.TWITTER.BASE_URL}/users/show.json`,
-        { params: { screen_name: username } }
+        { 
+          params: { screen_name: username },
+          headers: {
+            'Authorization': `Bearer ${config.bearerToken}`,
+            'User-Agent': 'XBot/1.0.0'
+          }
+        }
       )
 
       return response.data
@@ -324,6 +396,14 @@ class TwitterClient {
     if (error.response) {
       const { status, data } = error.response
       
+      // Log the full error for debugging
+      botLogger.error('Twitter API Error Details', {
+        status,
+        data,
+        url: error.config?.url,
+        method: error.config?.method
+      })
+      
       // Handle rate limiting
       if (status === HTTP_STATUS.TOO_MANY_REQUESTS) {
         const resetTime = error.response.headers['x-rate-limit-reset']
@@ -344,7 +424,7 @@ class TwitterClient {
       }
 
       // Handle other API errors
-      const errorMessage = data?.errors?.[0]?.message || data?.error || 'Unknown Twitter API error'
+      const errorMessage = data?.errors?.[0]?.message || data?.error || data?.detail || 'Unknown Twitter API error'
       return {
         code: status,
         message: errorMessage

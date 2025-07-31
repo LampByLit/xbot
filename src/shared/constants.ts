@@ -8,8 +8,8 @@ export const BOT_CONFIG = {
 // API Endpoints
 export const API_ENDPOINTS = {
   TWITTER: {
-    BASE_URL: 'https://api.twitter.com/1.1',
-    STREAM_URL: 'https://stream.twitter.com/1.1',
+    BASE_URL: 'https://api.twitter.com/2',
+    STREAM_URL: 'https://api.twitter.com/2',
     UPLOAD_URL: 'https://upload.twitter.com/1.1',
   },
   DEEPSEEK: {

@@ -186,10 +186,18 @@ class DeepSeekClient {
    */
   private async makeRequest(request: DeepSeekChatRequest): Promise<DeepSeekChatResponse> {
     try {
-      const axiosInstance = this.getAxiosInstance()
-      const response: AxiosResponse<DeepSeekChatResponse> = await axiosInstance.post(
-        API_ENDPOINTS.DEEPSEEK.CHAT_COMPLETIONS,
-        request
+      const config = this.getConfig()
+      const response: AxiosResponse<DeepSeekChatResponse> = await axios.post(
+        config.apiUrl,
+        request,
+        {
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'XBot/1.0.0'
+          },
+          timeout: 60000
+        }
       )
 
       return response.data
