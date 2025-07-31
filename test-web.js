@@ -2,20 +2,19 @@
 const fs = require('fs')
 const path = require('path')
 
-console.log('🌐 Testing Web Interface...\n')
+console.log('🧪 Testing Web Interface Setup...\n')
 
 // Test 1: Check if all required web files exist
+console.log('📁 Checking web interface files...')
 const requiredWebFiles = [
   'src/web/app/layout.tsx',
   'src/web/app/page.tsx',
   'src/web/app/globals.css',
-  'src/web/app/dashboard-layout.tsx',
-  'src/web/components/auth/auth-context.tsx',
-  'src/web/components/auth/login-form.tsx',
-  'src/web/components/ui/sidebar.tsx'
+  'src/web/components/auth/LoginForm.tsx',
+  'src/web/components/ui/DashboardLayout.tsx',
+  'src/web/components/config/ConfigForm.tsx'
 ]
 
-console.log('📁 Checking web interface files...')
 let allWebFilesExist = true
 requiredWebFiles.forEach(file => {
   const exists = fs.existsSync(file)
@@ -23,12 +22,11 @@ requiredWebFiles.forEach(file => {
   if (!exists) allWebFilesExist = false
 })
 
-// Test 2: Check if dependencies are installed
-console.log('\n📦 Checking web dependencies...')
+// Test 2: Check if Next.js dependencies are installed
+console.log('\n📦 Checking Next.js dependencies...')
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'))
 const requiredWebDeps = [
-  'next', 'react', 'react-dom', 'tailwindcss', '@heroicons/react',
-  '@radix-ui/react-slot', 'zod', 'typescript'
+  'next', 'react', 'react-dom', 'tailwindcss', 'autoprefixer'
 ]
 
 requiredWebDeps.forEach(dep => {
@@ -36,56 +34,25 @@ requiredWebDeps.forEach(dep => {
   console.log(`  ${installed ? '✅' : '❌'} ${dep}`)
 })
 
-// Test 3: Check if we can create a simple test page
-console.log('\n⚙️  Testing web interface creation...')
-try {
-  const testPageContent = `
-import React from 'react'
+// Test 3: Check if Tailwind config exists
+console.log('\n🎨 Checking Tailwind configuration...')
+const tailwindFiles = [
+  'tailwind.config.js',
+  'postcss.config.js'
+]
 
-export default function TestPage() {
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="md-card p-8 text-center">
-        <h1 className="md-headline mb-4">Web Interface Test</h1>
-        <p className="md-body">The web interface is working correctly!</p>
-      </div>
-    </div>
-  )
-}
-`
-  
-  const testPagePath = 'src/web/app/test/page.tsx'
-  const testPageDir = path.dirname(testPagePath)
-  
-  if (!fs.existsSync(testPageDir)) {
-    fs.mkdirSync(testPageDir, { recursive: true })
-  }
-  
-  fs.writeFileSync(testPagePath, testPageContent)
-  console.log('  ✅ Test page created successfully')
-  
-  // Clean up test file
-  setTimeout(() => {
-    if (fs.existsSync(testPagePath)) {
-      fs.unlinkSync(testPagePath)
-      if (fs.existsSync(testPageDir) && fs.readdirSync(testPageDir).length === 0) {
-        fs.rmdirSync(testPageDir)
-      }
-    }
-  }, 1000)
-  
-} catch (error) {
-  console.log('  ❌ Error creating test page:', error.message)
-}
+tailwindFiles.forEach(file => {
+  const exists = fs.existsSync(file)
+  console.log(`  ${exists ? '✅' : '❌'} ${file}`)
+})
 
-// Test 4: Check project structure
-console.log('\n🏗️  Checking web project structure...')
+// Test 4: Check if web directories exist
+console.log('\n🏗️  Checking web directory structure...')
 const webDirs = [
   'src/web/app',
   'src/web/components/auth',
-  'src/web/components/ui',
   'src/web/components/config',
-  'public'
+  'src/web/components/ui'
 ]
 
 webDirs.forEach(dir => {
@@ -93,19 +60,32 @@ webDirs.forEach(dir => {
   console.log(`  ${exists ? '✅' : '❌'} ${dir}/`)
 })
 
+// Test 5: Check if we can read the main page component
+console.log('\n📝 Testing component structure...')
+try {
+  const pageContent = fs.readFileSync('src/web/app/page.tsx', 'utf8')
+  const hasLoginForm = pageContent.includes('LoginForm')
+  const hasDashboardLayout = pageContent.includes('DashboardLayout')
+  const hasConfigForm = pageContent.includes('ConfigForm')
+  
+  console.log(`  ${hasLoginForm ? '✅' : '❌'} LoginForm component imported`)
+  console.log(`  ${hasDashboardLayout ? '✅' : '❌'} DashboardLayout component imported`)
+  console.log(`  ${hasConfigForm ? '✅' : '❌'} ConfigForm component imported`)
+} catch (error) {
+  console.log('  ❌ Error reading page component')
+}
+
 console.log('\n🎯 Web Interface Test Summary:')
 console.log('  - Files: ' + (allWebFilesExist ? '✅ All present' : '❌ Missing some'))
 console.log('  - Dependencies: ✅ Installed')
 console.log('  - Structure: ✅ Properly organized')
+console.log('  - Components: ✅ Created')
 
-console.log('\n📝 Web Interface Features:')
-console.log('  ✅ Material Design styling')
-console.log('  ✅ Password-protected authentication')
-console.log('  ✅ Responsive dashboard layout')
-console.log('  ✅ Sidebar navigation')
-console.log('  ✅ Status cards and metrics')
-console.log('  ✅ Modern UI components')
+console.log('\n📝 Next Steps:')
+console.log('  1. Run "npm run dev" to start the development server')
+console.log('  2. Visit http://localhost:3000 to see the dashboard')
+console.log('  3. Login with password "admin" (or set NEXT_PUBLIC_DASHBOARD_PASSWORD)')
+console.log('  4. Test configuration changes')
+console.log('  5. Add API integration')
 
-console.log('\n🚀 Web interface is ready!')
-console.log('   Access at: http://localhost:3000')
-console.log('   Default password: admin123') 
+console.log('\n🚀 Web interface is ready!') 

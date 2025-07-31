@@ -1,8 +1,8 @@
 'use client'
 
 import React from 'react'
-import { AuthProvider, useAuth } from '../components/auth/auth-context'
-import { LoginForm } from '../components/auth/login-form'
+import { AuthProvider, useAuth } from '../src/web/components/auth/auth-context'
+import { LoginForm } from '../src/web/components/auth/login-form'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
