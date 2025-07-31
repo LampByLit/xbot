@@ -32,17 +32,26 @@ setTimeout(() => {
     console.error('Error creating data directories:', error);
   }
   
-  const botProcess = spawn('node', ['dist/bot/index.js'], {
+  // Test if the bot file exists
+  const botPath = 'dist/bot/index.js';
+  if (!fs.existsSync(botPath)) {
+    console.error(`Bot file not found: ${botPath}`);
+    return;
+  }
+  console.log(`Bot file found: ${botPath}`);
+
+  const botProcess = spawn('node', [botPath], {
     stdio: ['inherit', 'pipe', 'pipe'],
-    shell: false
+    shell: false,
+    env: { ...process.env, NODE_ENV: 'production' }
   });
 
   botProcess.stdout.on('data', (data) => {
-    console.log(`Bot stdout: ${data}`);
+    console.log(`Bot stdout: ${data.toString()}`);
   });
 
   botProcess.stderr.on('data', (data) => {
-    console.error(`Bot stderr: ${data}`);
+    console.error(`Bot stderr: ${data.toString()}`);
   });
 
   botProcess.on('error', (error) => {
