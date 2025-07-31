@@ -83,7 +83,7 @@ class StreamHandler {
    */
   private startPolling(): void {
     const config = configManager.getConfig()
-    const pollIntervalMs = 2 * 60 * 1000 // Poll every 2 minutes
+    const pollIntervalMs = 5 * 60 * 1000 // Poll every 5 minutes (reduced from 2 minutes)
 
     botLogger.info('Starting mention polling', {
       intervalMs: pollIntervalMs,
