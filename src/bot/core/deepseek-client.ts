@@ -154,14 +154,14 @@ class DeepSeekClient {
 
       const result: BotResponseResult = {
         success: false,
-        error: deepseekError.message,
+        error: deepseekError.error?.message || 'Unknown error',
         model: request.config.model,
         timestamp: new Date().toISOString()
       }
 
       botLogger.error('DeepSeek response generation failed', error, {
         processingTime,
-        error: deepseekError.message
+        error: deepseekError.error?.message || 'Unknown error'
       })
 
       return result
@@ -295,13 +295,6 @@ User's message: ${message}
 
   /**
    * Check if client is connected
-   */
-  isConnected(): boolean {
-    return this.isConnected
-  }
-
-  /**
-   * Get connection status
    */
   getConnectionStatus(): { connected: boolean; config: Partial<DeepSeekClientConfig> } {
     return {

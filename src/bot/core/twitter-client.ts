@@ -77,7 +77,9 @@ class TwitterClient {
           }
 
           const authHeader = this.oauth.toHeader(this.oauth.authorize(request_data, token))
-          config.headers = { ...config.headers, ...authHeader }
+          if (config.headers) {
+            Object.assign(config.headers, authHeader)
+          }
         }
         return config
       },

@@ -115,8 +115,9 @@ class SystemPromptsManager {
         return configPrompt?.enabled ?? prompt.enabled
       })
       .sort((a, b) => {
-        const configPrompt = config.systemPrompts.find(p => p.id === prompt.id)
-        return (configPrompt?.priority ?? a.priority) - (configPrompt?.priority ?? b.priority)
+        const configPromptA = config.systemPrompts.find(p => p.id === a.id)
+        const configPromptB = config.systemPrompts.find(p => p.id === b.id)
+        return (configPromptA?.priority ?? a.priority) - (configPromptB?.priority ?? b.priority)
       })
   }
 

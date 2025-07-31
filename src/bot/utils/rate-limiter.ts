@@ -159,7 +159,7 @@ class RateLimiter {
   getAllStatuses(): Record<string, { remaining: number; capacity: number; resetTime: number }> {
     const statuses: Record<string, { remaining: number; capacity: number; resetTime: number }> = {}
     
-    for (const key of this.configs.keys()) {
+    for (const key of Array.from(this.configs.keys())) {
       statuses[key] = this.getStatus(key)
     }
 

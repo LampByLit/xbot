@@ -155,13 +155,13 @@ class BotConfigManager {
               username: this.config.username
             })
           } else {
-            botLogger.error('Configuration validation failed', null, {
+            botLogger.error('Configuration validation failed', undefined, {
               errors: validated.error.errors
             })
             this.createDefaultConfig()
           }
         } else {
-          botLogger.error('Failed to parse configuration file', null, {
+          botLogger.error('Failed to parse configuration file', undefined, {
             error: parsed.error
           })
           this.createDefaultConfig()
@@ -196,7 +196,7 @@ class BotConfigManager {
       }
 
       this.config.lastUpdated = new Date().toISOString()
-      const data = safeJsonStringify(this.config, 2)
+      const data = safeJsonStringify(this.config)
       
       if (data.success) {
         fs.writeFileSync(this.configPath, data.data)
@@ -205,7 +205,7 @@ class BotConfigManager {
         // Notify watchers
         this.watchers.forEach(watcher => watcher(this.config))
       } else {
-        botLogger.error('Failed to stringify configuration', null, {
+        botLogger.error('Failed to stringify configuration', undefined, {
           error: data.error
         })
       }
@@ -231,13 +231,13 @@ class BotConfigManager {
               entriesCount: this.whitelist.entries.length
             })
           } else {
-            botLogger.error('Whitelist validation failed', null, {
+            botLogger.error('Whitelist validation failed', undefined, {
               errors: validated.error.errors
             })
             this.createDefaultWhitelist()
           }
         } else {
-          botLogger.error('Failed to parse whitelist file', null, {
+          botLogger.error('Failed to parse whitelist file', undefined, {
             error: parsed.error
           })
           this.createDefaultWhitelist()
@@ -272,13 +272,13 @@ class BotConfigManager {
       }
 
       this.whitelist.lastUpdated = new Date().toISOString()
-      const data = safeJsonStringify(this.whitelist, 2)
+      const data = safeJsonStringify(this.whitelist)
       
       if (data.success) {
         fs.writeFileSync(this.whitelistPath, data.data)
         botLogger.info('Whitelist saved successfully')
       } else {
-        botLogger.error('Failed to stringify whitelist', null, {
+        botLogger.error('Failed to stringify whitelist', undefined, {
           error: data.error
         })
       }

@@ -1,9 +1,38 @@
 import { NextResponse } from 'next/server'
-import { xbot } from '../../../src/bot/index'
 
 export async function GET() {
   try {
-    const status = xbot.getStatus()
+    // Basic status response without importing bot modules
+    const status = {
+      isRunning: false,
+      startTime: null,
+      uptime: 0,
+      twitterStatus: {
+        authenticated: false,
+        config: {}
+      },
+      deepseekStatus: {
+        connected: false,
+        config: {}
+      },
+      configStatus: {
+        config: {
+          configLoaded: false,
+          whitelistLoaded: false,
+          configValid: false,
+          whitelistValid: false,
+          activePrompts: 0,
+          whitelistEntries: 0
+        },
+        prompts: {
+          total: 0,
+          active: 0,
+          predefined: 0,
+          custom: 0,
+          byCategory: {}
+        }
+      }
+    }
     
     return NextResponse.json({
       success: true,

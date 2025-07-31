@@ -67,7 +67,7 @@ const cleanupOldLogs = () => {
       const now = Date.now()
       const maxAge = 7 * 24 * 60 * 60 * 1000 // 7 days
       
-      files.forEach(file => {
+      files.forEach((file: string) => {
         const filePath = path.join(logDir, file)
         const stats = fs.statSync(filePath)
         
@@ -77,8 +77,8 @@ const cleanupOldLogs = () => {
         }
       })
     }
-  } catch (error) {
-    logger.error('Error cleaning up old logs', { error: error.message })
+  } catch (error: any) {
+    logger.error('Error cleaning up old logs', { error: error?.message || 'Unknown error' })
   }
 }
 
@@ -229,10 +229,10 @@ export const checkLoggerHealth = () => {
       logDir: fs.existsSync(logDir),
       writable: true
     }
-  } catch (error) {
+  } catch (error: any) {
     return {
       status: 'error',
-      error: error.message,
+      error: error?.message || 'Unknown error',
       logFile: false,
       logDir: false,
       writable: false

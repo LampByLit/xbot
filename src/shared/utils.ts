@@ -62,20 +62,22 @@ export function getOptionalEnvVar(key: string, defaultValue: string): string {
 }
 
 // Safe JSON parsing
-export function safeJsonParse<T>(jsonString: string, defaultValue: T): T {
+export function safeJsonParse<T>(jsonString: string): { success: true; data: T } | { success: false; error: string } {
   try {
-    return JSON.parse(jsonString) as T
-  } catch {
-    return defaultValue
+    const parsed = JSON.parse(jsonString) as T
+    return { success: true, data: parsed }
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Invalid JSON' }
   }
 }
 
 // Safe JSON stringifying
-export function safeJsonStringify(obj: any): string {
+export function safeJsonStringify(obj: any): { success: true; data: string } | { success: false; error: string } {
   try {
-    return JSON.stringify(obj, null, 2)
-  } catch {
-    return '{}'
+    const stringified = JSON.stringify(obj, null, 2)
+    return { success: true, data: stringified }
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to stringify object' }
   }
 }
 

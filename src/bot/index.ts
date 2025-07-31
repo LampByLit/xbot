@@ -57,7 +57,7 @@ class XBot {
         botLogger.info('XBot initialization completed successfully')
         return { success: true, errors: [] }
       } else {
-        botLogger.error('XBot initialization completed with errors', null, { errors })
+        botLogger.error('XBot initialization completed with errors', undefined, { errors })
         return { success: false, errors }
       }
     } catch (error: any) {
@@ -78,7 +78,7 @@ class XBot {
 
     const initResult = await this.initialize()
     if (!initResult.success) {
-      botLogger.error('Failed to initialize bot', null, { errors: initResult.errors })
+      botLogger.error('Failed to initialize bot', undefined, { errors: initResult.errors })
       throw new Error('Bot initialization failed')
     }
 
@@ -87,9 +87,9 @@ class XBot {
     botLogger.info('XBot started successfully', {
       startTime: this.startTime.toISOString(),
       config: {
-        username: config.username,
-        hashtag: config.hashtag,
-        enabled: config.enabled,
+        username: configManager.getConfig().username,
+        hashtag: configManager.getConfig().hashtag,
+        enabled: configManager.getConfig().enabled,
         activePrompts: systemPromptsManager.getActivePromptModules().length
       }
     })
