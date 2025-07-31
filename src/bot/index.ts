@@ -22,6 +22,7 @@ class XBot {
    */
   async initialize(): Promise<{ success: boolean; errors: string[] }> {
     const errors: string[] = []
+    const warnings: string[] = []
 
     try {
       // Check logger health
@@ -33,19 +34,31 @@ class XBot {
       }
 
       // Test Twitter API connection
-      const twitterTest = await twitterClient.testConnection()
-      if (!twitterTest.success) {
-        errors.push(`Twitter API connection failed: ${twitterTest.error}`)
-      } else {
-        botLogger.info('Twitter API connection successful')
+      try {
+        const twitterTest = await twitterClient.testConnection()
+        if (!twitterTest.success) {
+          warnings.push(`Twitter API connection failed: ${twitterTest.error}`)
+          botLogger.warn('Twitter API connection failed, but continuing', { error: twitterTest.error })
+        } else {
+          botLogger.info('Twitter API connection successful')
+        }
+      } catch (error: any) {
+        warnings.push(`Twitter API connection error: ${error.message}`)
+        botLogger.warn('Twitter API connection error, but continuing', error)
       }
 
       // Test DeepSeek API connection
-      const deepseekTest = await deepseekClient.testConnection()
-      if (!deepseekTest.success) {
-        errors.push(`DeepSeek API connection failed: ${deepseekTest.error}`)
-      } else {
-        botLogger.info('DeepSeek API connection successful')
+      try {
+        const deepseekTest = await deepseekClient.testConnection()
+        if (!deepseekTest.success) {
+          warnings.push(`DeepSeek API connection failed: ${deepseekTest.error}`)
+          botLogger.warn('DeepSeek API connection failed, but continuing', { error: deepseekTest.error })
+        } else {
+          botLogger.info('DeepSeek API connection successful')
+        }
+      } catch (error: any) {
+        warnings.push(`DeepSeek API connection error: ${error.message}`)
+        botLogger.warn('DeepSeek API connection error, but continuing', error)
       }
 
       // Check bot configuration
@@ -55,10 +68,14 @@ class XBot {
       }
 
       if (errors.length === 0) {
-        botLogger.info('XBot initialization completed successfully')
+        if (warnings.length > 0) {
+          botLogger.warn('XBot initialization completed with warnings', { warnings })
+        } else {
+          botLogger.info('XBot initialization completed successfully')
+        }
         return { success: true, errors: [] }
       } else {
-        botLogger.error('XBot initialization completed with errors', undefined, { errors })
+        botLogger.error('XBot initialization completed with errors', undefined, { errors, warnings })
         return { success: false, errors }
       }
     } catch (error: any) {
@@ -238,9 +255,17 @@ if (require.main === module) {
     try {
       await xbot.start()
       
-      // Run a quick test
-      const testResult = await xbot.testBot()
-      botLogger.info('Bot test completed', testResult)
+      // Run a quick test, but don't fail if rate limited
+      try {
+        const testResult = await xbot.testBot()
+        botLogger.info('Bot test completed', testResult)
+        
+        if (!testResult.success) {
+          botLogger.warn('Bot test failed, but continuing to run', testResult)
+        }
+      } catch (testError: any) {
+        botLogger.warn('Bot test failed due to rate limits or API issues, but continuing to run', testError)
+      }
       
       // Keep the process running
       botLogger.info('Bot is running. Press Ctrl+C to stop.')
