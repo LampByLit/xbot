@@ -26,35 +26,54 @@ const consoleFormat = winston.format.combine(
   })
 )
 
-// Create logger instance
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || LOG_LEVELS.INFO,
-  format: logFormat,
-  defaultMeta: { service: 'xbot' },
-  transports: [
+// Create logger instance with error handling for file system
+const createLogger = () => {
+  const transports: winston.transport[] = []
+  
+  // Always add console transport for Railway
+  transports.push(new winston.transports.Console({
+    format: consoleFormat
+  }))
+  
+  // Try to add file transports, but don't fail if they can't be created
+  try {
+    const fs = require('fs')
+    
+    // Ensure log directory exists
+    if (!fs.existsSync(PATHS.LOGS_DIR)) {
+      fs.mkdirSync(PATHS.LOGS_DIR, { recursive: true })
+    }
+    
     // File transport for all logs
-    new winston.transports.File({
+    transports.push(new winston.transports.File({
       filename: PATHS.LOG_FILE,
       maxsize: 10 * 1024 * 1024, // 10MB
       maxFiles: 5,
       tailable: true
-    }),
+    }))
+    
     // Separate error file
-    new winston.transports.File({
+    transports.push(new winston.transports.File({
       filename: path.join(PATHS.LOGS_DIR, 'error.log'),
       level: LOG_LEVELS.ERROR,
       maxsize: 10 * 1024 * 1024, // 10MB
       maxFiles: 5
-    })
-  ]
-})
-
-// Add console transport for development
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: consoleFormat
-  }))
+    }))
+  } catch (error) {
+    console.warn('Could not create file log transports, using console only:', error)
+  }
+  
+  return winston.createLogger({
+    level: process.env.LOG_LEVEL || LOG_LEVELS.INFO,
+    format: logFormat,
+    defaultMeta: { service: 'xbot' },
+    transports
+  })
 }
+
+const logger = createLogger()
+
+// Console transport is always added in createLogger() for Railway compatibility
 
 // Log rotation and cleanup
 const cleanupOldLogs = () => {
