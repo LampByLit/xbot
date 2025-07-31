@@ -108,6 +108,140 @@ function testBotLoading() {
   }
 }
 
+// Test API connections and rate limits
+async function testAPIConnections() {
+  log('🌐 Testing API connections...');
+  
+  try {
+    // Test Twitter API connection
+    log('🐦 Testing Twitter API...');
+    const axios = require('axios');
+    const OAuth = require('oauth-1.0a');
+    const crypto = require('crypto');
+    
+    const oauth = new OAuth({
+      consumer: {
+        key: process.env.X_API_KEY,
+        secret: process.env.X_API_SECRET
+      },
+      signature_method: 'HMAC-SHA1',
+      hash_function(base_string, key) {
+        return crypto
+          .createHmac('sha1', key)
+          .update(base_string)
+          .digest('base64');
+      }
+    });
+    
+    const request_data = {
+      url: 'https://api.twitter.com/2/users/me',
+      method: 'GET'
+    };
+    
+    const token = {
+      key: process.env.X_ACCESS_TOKEN,
+      secret: process.env.X_ACCESS_TOKEN_SECRET
+    };
+    
+    const headers = oauth.toHeader(oauth.authorize(request_data, token));
+    
+    try {
+      const response = await axios.get(request_data.url, { headers });
+      log('✅ Twitter API connection successful');
+      log(`Twitter user ID: ${response.data.data.id}`);
+      
+      // Check rate limits from headers
+      const rateLimitRemaining = response.headers['x-rate-limit-remaining'];
+      const rateLimitReset = response.headers['x-rate-limit-reset'];
+      
+      if (rateLimitRemaining !== undefined) {
+        log(`Twitter rate limit remaining: ${rateLimitRemaining}`);
+        if (parseInt(rateLimitRemaining) <= 0) {
+          log('❌ Twitter API rate limit exceeded!', 'error');
+          return false;
+        }
+      }
+      
+      if (rateLimitReset) {
+        const resetTime = new Date(parseInt(rateLimitReset) * 1000);
+        log(`Twitter rate limit resets at: ${resetTime.toISOString()}`);
+      }
+      
+    } catch (error) {
+      if (error.response) {
+        log(`❌ Twitter API error: ${error.response.status} - ${error.response.statusText}`, 'error');
+        log(`Twitter API response: ${JSON.stringify(error.response.data)}`, 'error');
+        
+        // Check for rate limit errors
+        if (error.response.status === 429) {
+          log('❌ Twitter API rate limit exceeded!', 'error');
+          const retryAfter = error.response.headers['x-rate-limit-reset'];
+          if (retryAfter) {
+            const resetTime = new Date(parseInt(retryAfter) * 1000);
+            log(`Rate limit resets at: ${resetTime.toISOString()}`, 'error');
+          }
+          return false;
+        }
+      } else {
+        log(`❌ Twitter API connection failed: ${error.message}`, 'error');
+      }
+      return false;
+    }
+    
+    // Test DeepSeek API connection
+    log('🤖 Testing DeepSeek API...');
+    try {
+      const deepseekResponse = await axios.post(
+        'https://api.deepseek.com/v1/chat/completions',
+        {
+          model: 'deepseek-chat',
+          messages: [{ role: 'user', content: 'Hello' }],
+          max_tokens: 10
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      log('✅ DeepSeek API connection successful');
+      
+      // Check for rate limit headers
+      const deepseekRateLimit = deepseekResponse.headers['x-ratelimit-remaining'];
+      if (deepseekRateLimit !== undefined) {
+        log(`DeepSeek rate limit remaining: ${deepseekRateLimit}`);
+        if (parseInt(deepseekRateLimit) <= 0) {
+          log('❌ DeepSeek API rate limit exceeded!', 'error');
+          return false;
+        }
+      }
+      
+    } catch (error) {
+      if (error.response) {
+        log(`❌ DeepSeek API error: ${error.response.status} - ${error.response.statusText}`, 'error');
+        log(`DeepSeek API response: ${JSON.stringify(error.response.data)}`, 'error');
+        
+        if (error.response.status === 429) {
+          log('❌ DeepSeek API rate limit exceeded!', 'error');
+          return false;
+        }
+      } else {
+        log(`❌ DeepSeek API connection failed: ${error.message}`, 'error');
+      }
+      return false;
+    }
+    
+    log('✅ All API connections successful');
+    return true;
+    
+  } catch (error) {
+    log(`❌ API testing failed: ${error.message}`, 'error');
+    return false;
+  }
+}
+
 // Start the web interface
 log('🌐 Starting web interface...');
 const webProcess = spawn('node', ['node_modules/.bin/next', 'start'], {
@@ -125,36 +259,56 @@ setTimeout(() => {
   const modulesOk = checkModules();
   const botOk = testBotLoading();
   
-  if (envOk && fsOk && modulesOk && botOk) {
+  // Test API connections (async)
+  const apiOk = await testAPIConnections();
+  
+  if (envOk && fsOk && modulesOk && botOk && apiOk) {
     log('✅ All tests passed, starting bot...');
     
-    const botProcess = spawn('node', ['dist/bot/index.js'], {
-      stdio: ['inherit', 'pipe', 'pipe'],
-      shell: false,
-      env: { ...process.env, NODE_ENV: 'production' }
-    });
+         log('🤖 Starting bot process...');
+     const botProcess = spawn('node', ['dist/bot/index.js'], {
+       stdio: ['inherit', 'pipe', 'pipe'],
+       shell: false,
+       env: { ...process.env, NODE_ENV: 'production' }
+     });
 
-    botProcess.stdout.on('data', (data) => {
-      log(`Bot stdout: ${data.toString()}`);
-    });
+     let botOutput = '';
+     let botErrors = '';
 
-    botProcess.stderr.on('data', (data) => {
-      log(`Bot stderr: ${data.toString()}`, 'error');
-    });
+     botProcess.stdout.on('data', (data) => {
+       const output = data.toString();
+       botOutput += output;
+       log(`Bot stdout: ${output}`);
+     });
 
-    botProcess.on('error', (error) => {
-      log(`Bot process error: ${error.message}`, 'error');
-    });
+     botProcess.stderr.on('data', (data) => {
+       const error = data.toString();
+       botErrors += error;
+       log(`Bot stderr: ${error}`, 'error');
+     });
 
-    botProcess.on('exit', (code) => {
-      log(`Bot process exited with code ${code}`);
-    });
+     botProcess.on('error', (error) => {
+       log(`Bot process error: ${error.message}`, 'error');
+     });
+
+     botProcess.on('exit', (code) => {
+       log(`Bot process exited with code ${code}`);
+       
+       if (code !== 0) {
+         log('❌ Bot failed to start properly', 'error');
+         log(`Bot output: ${botOutput}`, 'error');
+         log(`Bot errors: ${botErrors}`, 'error');
+       } else {
+         log('✅ Bot started successfully');
+       }
+     });
   } else {
     log('❌ Tests failed, not starting bot', 'error');
     log(`Environment: ${envOk ? '✅' : '❌'}`);
     log(`File system: ${fsOk ? '✅' : '❌'}`);
     log(`Modules: ${modulesOk ? '✅' : '❌'}`);
     log(`Bot loading: ${botOk ? '✅' : '❌'}`);
+    log(`API connections: ${apiOk ? '✅' : '❌'}`);
   }
 }, 5000);
 
