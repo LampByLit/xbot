@@ -202,10 +202,27 @@ class TwitterClient {
 
       // Convert v2 response to v1.1 format for compatibility
       return {
+        id: parseInt(response.data.data.id),
         id_str: response.data.data.id,
-        text: response.data.data.text,
         created_at: response.data.data.created_at,
-        user: response.data.includes?.users?.[0] || {}
+        text: response.data.data.text,
+        truncated: false,
+        entities: {
+          hashtags: [],
+          user_mentions: []
+        },
+        source: 'XBot',
+        user: response.data.includes?.users?.[0] || {},
+        geo: null,
+        coordinates: null,
+        place: null,
+        contributors: null,
+        is_quote_status: false,
+        retweet_count: 0,
+        favorite_count: 0,
+        favorited: false,
+        retweeted: false,
+        lang: 'en'
       }
     } catch (error: any) {
       const twitterError = this.handleTwitterError(error)
@@ -233,6 +250,13 @@ class TwitterClient {
     await twitterRateLimiter.waitForSearch()
 
     try {
+      // First, get the current user's ID
+      const config = this.getConfig()
+      const userResponse = await this.getAxiosInstance().get(
+        `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me`
+      )
+      const userId = userResponse.data.data.id
+
       const params: any = { 
         'max_results': count,
         'tweet.fields': 'created_at,author_id,text',
@@ -241,29 +265,18 @@ class TwitterClient {
       }
       if (sinceId) params.since_id = sinceId
 
-      botLogger.apiRequest('twitter', 'users/me/mentions', { count, sinceId })
+      botLogger.apiRequest('twitter', `users/${userId}/mentions`, { count, sinceId, userId })
 
-      const config = this.getConfig()
-      const response: AxiosResponse<any> = await axios.get(
-        `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me/mentions`,
-        { 
-          params,
-          headers: {
-            'User-Agent': 'XBot/1.0.0',
-            ...this.getOAuth().toHeader(this.getOAuth().authorize({
-              url: `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me/mentions`,
-              method: 'GET'
-            }, {
-              key: config.accessToken,
-              secret: config.accessTokenSecret
-            }))
-          }
-        }
+      // Use the configured axios instance with OAuth interceptors
+      const response: AxiosResponse<any> = await this.getAxiosInstance().get(
+        `${API_ENDPOINTS.TWITTER.BASE_URL}/users/${userId}/mentions`,
+        { params }
       )
 
       botLogger.info('Mentions retrieved', {
         count: response.data.data?.length || 0,
-        sinceId
+        sinceId,
+        userId
       })
 
       // Convert v2 response to v1.1 format for compatibility
@@ -397,7 +410,7 @@ class TwitterClient {
       const { status, data } = error.response
       
       // Log the full error for debugging
-      botLogger.error('Twitter API Error Details', {
+      botLogger.error('Twitter API Error Details', error, {
         status,
         data,
         url: error.config?.url,

@@ -4,6 +4,7 @@ import twitterClient from './core/twitter-client'
 import deepseekClient from './core/deepseek-client'
 import configManager from './config/bot-config'
 import systemPromptsManager from './config/system-prompts'
+import streamHandler from './core/stream-handler'
 
 // Load environment variables
 dotenv.config()
@@ -93,6 +94,15 @@ class XBot {
         activePrompts: systemPromptsManager.getActivePromptModules().length
       }
     })
+
+    // Start the stream handler
+    try {
+      await streamHandler.start()
+      botLogger.info('Stream handler started successfully')
+    } catch (error: any) {
+      botLogger.error('Failed to start stream handler', error)
+      // Don't throw here - bot can still work without stream handler
+    }
   }
 
   /**
@@ -103,6 +113,9 @@ class XBot {
       botLogger.warn('Bot is not running')
       return
     }
+
+    // Stop the stream handler
+    streamHandler.stop()
 
     this.isRunning = false
     const uptime = this.startTime ? Date.now() - this.startTime.getTime() : 0
@@ -123,6 +136,7 @@ class XBot {
     twitterStatus: any
     deepseekStatus: any
     configStatus: any
+    streamStatus: any
   } {
     const uptime = this.startTime ? Date.now() - this.startTime.getTime() : 0
     
@@ -135,7 +149,8 @@ class XBot {
       configStatus: {
         config: configManager.getHealthStatus(),
         prompts: systemPromptsManager.getPromptStatistics()
-      }
+      },
+      streamStatus: streamHandler.getStatus()
     }
   }
 
@@ -173,7 +188,7 @@ class XBot {
             userId: '456',
             username: 'testuser'
           },
-          config: deepseekClient.getConfig()
+          config: deepseekClient.getCurrentConfig()
         }
 
         const response = await deepseekClient.generateBotResponse(testRequest)
