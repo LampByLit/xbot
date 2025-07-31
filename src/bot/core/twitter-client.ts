@@ -17,6 +17,7 @@ import { API_ENDPOINTS, HTTP_STATUS } from '../../shared/constants'
 import { botLogger } from '../utils/logger'
 import { twitterRateLimiter } from '../utils/rate-limiter'
 import { getRequiredEnvVar } from '../../shared/utils'
+import stateManager from './state-manager'
 
 interface TwitterClientConfig {
   apiKey: string
@@ -34,6 +35,33 @@ class TwitterClient {
 
   constructor() {
     // Initialize lazily to avoid environment variable access at import time
+  }
+
+  // Check if we can make API calls
+  private canMakeApiCall(): boolean {
+    if (!stateManager.canMakeApiCall('twitter')) {
+      const timeUntilReset = stateManager.getTimeUntilReset('twitter')
+      botLogger.warn('Twitter API rate limit reached', { 
+        timeUntilReset: Math.ceil(timeUntilReset / 1000 / 60) + ' minutes' 
+      })
+      return false
+    }
+    return true
+  }
+
+  // Update rate limit info from response headers
+  private updateRateLimitInfo(response: AxiosResponse): void {
+    const remaining = response.headers['x-rate-limit-remaining']
+    const reset = response.headers['x-rate-limit-reset']
+    
+    if (remaining !== undefined) {
+      stateManager.updateApiCallsRemaining('twitter', parseInt(remaining))
+    }
+    
+    if (reset) {
+      const resetTime = new Date(parseInt(reset) * 1000).toISOString()
+      stateManager.updateRateLimitReset('twitter', resetTime)
+    }
   }
 
   private getConfig(): TwitterClientConfig {
@@ -144,15 +172,41 @@ class TwitterClient {
    */
   async testConnection(): Promise<{ success: boolean; error?: string }> {
     try {
-      // Test by posting a simple tweet using v2 API
-      const testTweet: TwitterPostRequest = {
-        status: '🤖 XBot test - ' + new Date().toISOString()
+      // Check rate limits first
+      if (!this.canMakeApiCall()) {
+        return { success: false, error: 'Rate limit exceeded' }
       }
+
+      // Use cached user ID if available, otherwise get it
+      const cachedUserId = stateManager.getUserId()
+      if (cachedUserId) {
+        botLogger.info('Using cached user ID', { userId: cachedUserId })
+        this.isAuthenticated = true
+        return { success: true }
+      }
+
+      // Get user ID from API
+      botLogger.apiRequest('twitter', 'users/me')
       
-      const response = await this.postTweet(testTweet)
-      this.isAuthenticated = true
-      botLogger.info('Twitter API connection test successful', { tweetId: response.id_str })
-      return { success: true }
+      const response = await this.getAxiosInstance().get(`${API_ENDPOINTS.TWITTER.BASE_URL}/users/me`)
+      
+      // Update rate limit info
+      this.updateRateLimitInfo(response)
+      
+      botLogger.apiResponse('twitter', 'users/me', response.status)
+      
+      if (response.status === HTTP_STATUS.OK) {
+        this.isAuthenticated = true
+        
+        // Cache the user ID
+        const userId = response.data.data.id
+        stateManager.setUserId(userId)
+        
+        botLogger.info('Twitter API connection test successful', { userId })
+        return { success: true }
+      } else {
+        return { success: false, error: `HTTP ${response.status}` }
+      }
     } catch (error: any) {
       this.isAuthenticated = false
       const errorMessage = error.response?.data?.errors?.[0]?.message || error.message
@@ -247,25 +301,42 @@ class TwitterClient {
    * Get mentions timeline
    */
   async getMentions(count: number = 100, sinceId?: string): Promise<TwitterMention[]> {
+    // Check rate limits first
+    if (!this.canMakeApiCall()) {
+      throw new Error('Rate limit exceeded')
+    }
+
     await twitterRateLimiter.waitForSearch()
 
     try {
-      // First, get the current user's ID
-      const config = this.getConfig()
-      const userResponse = await this.getAxiosInstance().get(
-        `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me`
-      )
-      const userId = userResponse.data.data.id
+      // Use cached user ID if available
+      let userId = stateManager.getUserId()
+      if (!userId) {
+        botLogger.info('No cached user ID, fetching from API')
+        const userResponse = await this.getAxiosInstance().get(
+          `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me`
+        )
+        userId = userResponse.data.data.id
+        stateManager.setUserId(userId)
+      }
 
+      // Use persistent lastMentionId if no sinceId provided
+      const actualSinceId = sinceId || stateManager.getLastMentionId()
+      
       const params: any = { 
         'max_results': count,
         'tweet.fields': 'created_at,author_id,text',
         'user.fields': 'username,name',
         'expansions': 'author_id'
       }
-      if (sinceId) params.since_id = sinceId
+      if (actualSinceId) params.since_id = actualSinceId
 
-      botLogger.apiRequest('twitter', `users/${userId}/mentions`, { count, sinceId, userId })
+      botLogger.apiRequest('twitter', `users/${userId}/mentions`, { 
+        count, 
+        sinceId: actualSinceId, 
+        userId,
+        usingCachedUserId: !!stateManager.getUserId()
+      })
 
       // Use the configured axios instance with OAuth interceptors
       const response: AxiosResponse<any> = await this.getAxiosInstance().get(
@@ -273,14 +344,26 @@ class TwitterClient {
         { params }
       )
 
+      // Update rate limit info
+      this.updateRateLimitInfo(response)
+
+      const mentions = response.data.data || []
+      
+      // Update lastMentionId if we got new mentions
+      if (mentions.length > 0) {
+        const latestMentionId = mentions[0].id
+        stateManager.setLastMentionId(latestMentionId)
+      }
+
       botLogger.info('Mentions retrieved', {
-        count: response.data.data?.length || 0,
-        sinceId,
-        userId
+        count: mentions.length,
+        sinceId: actualSinceId,
+        userId,
+        usingCachedUserId: !!stateManager.getUserId()
       })
 
       // Convert v2 response to v1.1 format for compatibility
-      return (response.data.data || []).map((tweet: any) => ({
+      return mentions.map((tweet: any) => ({
         id_str: tweet.id,
         text: tweet.text,
         created_at: tweet.created_at,

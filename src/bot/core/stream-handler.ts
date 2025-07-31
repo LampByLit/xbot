@@ -3,6 +3,7 @@ import twitterClient from './twitter-client'
 import deepseekClient from './deepseek-client'
 import configManager from '../config/bot-config'
 import systemPromptsManager from '../config/system-prompts'
+import stateManager from './state-manager'
 import { TwitterMention } from '../types/twitter-types'
 import { BotResponseRequest } from '../types/deepseek-types'
 
@@ -26,7 +27,6 @@ interface RetryConfig {
 class StreamHandler {
   private isRunning: boolean = false
   private pollInterval: NodeJS.Timeout | null = null
-  private lastMentionId: string | null = null
   private processedMentions: Set<string> = new Set()
   private failedMentions: Map<string, { retries: number; lastError: string; nextRetry: number }> = new Map()
   private config = configManager.getConfig()
@@ -35,6 +35,36 @@ class StreamHandler {
     baseDelay: 1000, // 1 second
     maxDelay: 30000, // 30 seconds
     backoffMultiplier: 2
+  }
+
+  // Get polling interval based on rate limits
+  private getPollInterval(): number {
+    const baseInterval = 120000 // 2 minutes (increased from 60s)
+    
+    // Check if we're approaching rate limits
+    const twitterCallsRemaining = stateManager.getApiCallsRemaining('twitter')
+    const deepseekCallsRemaining = stateManager.getApiCallsRemaining('deepseek')
+    
+    // If we're low on API calls, increase polling interval
+    if (twitterCallsRemaining < 100 || deepseekCallsRemaining < 20) {
+      botLogger.warn('Low API calls remaining, increasing polling interval', {
+        twitterCallsRemaining,
+        deepseekCallsRemaining,
+        newInterval: '5 minutes'
+      })
+      return 300000 // 5 minutes
+    }
+    
+    // If we're very low, pause polling
+    if (twitterCallsRemaining < 50 || deepseekCallsRemaining < 10) {
+      botLogger.warn('Very low API calls remaining, pausing polling', {
+        twitterCallsRemaining,
+        deepseekCallsRemaining
+      })
+      return 600000 // 10 minutes
+    }
+    
+    return baseInterval
   }
 
   constructor() {
@@ -64,20 +94,31 @@ class StreamHandler {
     }
 
     this.isRunning = true
+    const initialPollInterval = this.getPollInterval()
+    
     botLogger.info('Stream handler started', {
       username: this.config.username,
       hashtag: this.config.hashtag,
-      pollInterval: '60 seconds',
+      pollInterval: `${Math.round(initialPollInterval / 1000)} seconds`,
       retryConfig: this.retryConfig
     })
 
     // Start polling immediately
     await this.pollMentions()
 
-    // Set up polling interval
+    // Set up polling interval with dynamic timing
     this.pollInterval = setInterval(async () => {
       await this.pollMentions()
-    }, 60000) // 60 seconds
+      
+      // Update polling interval based on rate limits
+      const newInterval = this.getPollInterval()
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval)
+        this.pollInterval = setInterval(async () => {
+          await this.pollMentions()
+        }, newInterval)
+      }
+    }, initialPollInterval)
   }
 
   /**
@@ -104,13 +145,24 @@ class StreamHandler {
    */
   private async pollMentions(): Promise<void> {
     try {
+      // Check if we can make API calls
+      if (!stateManager.canMakeApiCall('twitter')) {
+        const timeUntilReset = stateManager.getTimeUntilReset('twitter')
+        botLogger.warn('Skipping poll due to rate limits', {
+          timeUntilReset: Math.ceil(timeUntilReset / 1000 / 60) + ' minutes'
+        })
+        return
+      }
+
+      const lastMentionId = stateManager.getLastMentionId()
       botLogger.info('Polling for mentions', {
-        sinceId: this.lastMentionId,
+        sinceId: lastMentionId,
         username: this.config.username,
-        hashtag: this.config.hashtag
+        hashtag: this.config.hashtag,
+        twitterCallsRemaining: stateManager.getApiCallsRemaining('twitter')
       })
 
-      const mentions = await twitterClient.getMentions(100, this.lastMentionId || undefined)
+      const mentions = await twitterClient.getMentions(100, lastMentionId || undefined)
       
       if (mentions.length === 0) {
         botLogger.info('No new mentions found')
@@ -122,11 +174,6 @@ class StreamHandler {
         oldestId: mentions[mentions.length - 1]?.id_str,
         newestId: mentions[0]?.id_str
       })
-
-      // Update last mention ID
-      if (mentions.length > 0) {
-        this.lastMentionId = mentions[0].id_str
-      }
 
       // Process mentions in reverse order (oldest first)
       for (const mention of mentions.reverse()) {
@@ -536,10 +583,18 @@ class StreamHandler {
       hashtag: string
       whitelistEnabled: boolean
     }
+    state: {
+      twitterCallsRemaining: number
+      deepseekCallsRemaining: number
+      twitterResetTime: string | null
+      deepseekResetTime: string | null
+      lastPollTime: string | null
+    }
   } {
+    const stateSummary = stateManager.getStateSummary()
     return {
       isRunning: this.isRunning,
-      lastMentionId: this.lastMentionId,
+      lastMentionId: stateSummary.lastMentionId,
       processedMentionsCount: this.processedMentions.size,
       failedMentionsCount: this.failedMentions.size,
       retryConfig: this.retryConfig,
@@ -548,6 +603,13 @@ class StreamHandler {
         username: this.config.username,
         hashtag: this.config.hashtag,
         whitelistEnabled: this.config.whitelistEnabled
+      },
+      state: {
+        twitterCallsRemaining: stateSummary.twitterCallsRemaining,
+        deepseekCallsRemaining: stateSummary.deepseekCallsRemaining,
+        twitterResetTime: stateSummary.twitterResetTime,
+        deepseekResetTime: stateSummary.deepseekResetTime,
+        lastPollTime: stateSummary.lastPollTime
       }
     }
   }
