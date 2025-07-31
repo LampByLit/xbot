@@ -45,6 +45,18 @@ class StreamHandler {
     const twitterCallsRemaining = stateManager.getApiCallsRemaining('twitter')
     const deepseekCallsRemaining = stateManager.getApiCallsRemaining('deepseek')
     
+    // If we're rate limited, use much longer interval
+    if (!stateManager.canMakeApiCall('twitter')) {
+      const timeUntilReset = stateManager.getTimeUntilReset('twitter')
+      const conservativeInterval = Math.max(timeUntilReset + 120000, 600000) // Reset time + 2 minutes, minimum 10 minutes
+      botLogger.warn('Rate limited, using conservative polling interval', {
+        twitterCallsRemaining,
+        timeUntilReset: Math.ceil(timeUntilReset / 1000 / 60) + ' minutes',
+        newInterval: Math.ceil(conservativeInterval / 1000 / 60) + ' minutes'
+      })
+      return conservativeInterval
+    }
+    
     // If we're low on API calls, increase polling interval
     if (twitterCallsRemaining < 100 || deepseekCallsRemaining < 20) {
       botLogger.warn('Low API calls remaining, increasing polling interval', {
@@ -148,8 +160,20 @@ class StreamHandler {
       // Check if we can make API calls
       if (!stateManager.canMakeApiCall('twitter')) {
         const timeUntilReset = stateManager.getTimeUntilReset('twitter')
+        const minutesUntilReset = Math.ceil(timeUntilReset / 1000 / 60)
         botLogger.warn('Skipping poll due to rate limits', {
-          timeUntilReset: Math.ceil(timeUntilReset / 1000 / 60) + ' minutes'
+          timeUntilReset: minutesUntilReset + ' minutes',
+          nextPollAttempt: new Date(Date.now() + timeUntilReset + 60000).toISOString() // Add 1 minute buffer
+        })
+        return
+      }
+
+      // Additional check for very low API calls remaining
+      const twitterCallsRemaining = stateManager.getApiCallsRemaining('twitter')
+      if (twitterCallsRemaining < 10) {
+        botLogger.warn('Very low API calls remaining, skipping poll', {
+          twitterCallsRemaining,
+          nextPollAttempt: new Date(Date.now() + 300000).toISOString() // Wait 5 minutes
         })
         return
       }
@@ -159,7 +183,7 @@ class StreamHandler {
         sinceId: lastMentionId,
         username: this.config.username,
         hashtag: this.config.hashtag,
-        twitterCallsRemaining: stateManager.getApiCallsRemaining('twitter')
+        twitterCallsRemaining
       })
 
       const mentions = await twitterClient.getMentions(100, lastMentionId || undefined)

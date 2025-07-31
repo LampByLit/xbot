@@ -317,16 +317,31 @@ class TwitterClient {
       // Use cached user ID if available
       let userId = stateManager.getUserId()
       if (!userId) {
-        botLogger.info('No cached user ID, fetching from API')
-        const userResponse = await this.getAxiosInstance().get(
-          `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me`
-        )
-        userId = userResponse.data.data.id
-        if (userId) {
-          stateManager.setUserId(userId)
-        } else {
-          throw new Error('Failed to get user ID from Twitter API')
+        botLogger.info('No cached user ID, attempting to fetch from API')
+        
+        // Check if we're rate limited before making the call
+        if (!this.canMakeApiCall()) {
+          botLogger.warn('Rate limited, skipping user ID fetch')
+          throw new Error('Rate limit exceeded - cannot fetch user ID')
         }
+        
+        try {
+          const userResponse = await this.getAxiosInstance().get(
+            `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me`
+          )
+          userId = userResponse.data.data.id
+          if (userId) {
+            stateManager.setUserId(userId)
+            botLogger.info('User ID cached successfully', { userId })
+          } else {
+            throw new Error('Failed to get user ID from Twitter API')
+          }
+        } catch (error: any) {
+          botLogger.error('Failed to fetch user ID', error)
+          throw new Error('Cannot proceed without user ID')
+        }
+      } else {
+        botLogger.debug('Using cached user ID', { userId })
       }
 
       // Use persistent lastMentionId if no sinceId provided
