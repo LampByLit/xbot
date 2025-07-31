@@ -4,14 +4,30 @@ import { useState, useEffect } from 'react'
 import LoginForm from '../components/auth/LoginForm'
 import DashboardLayout from '../components/ui/DashboardLayout'
 import ConfigForm from '../components/config/ConfigForm'
-import { apiService, BotConfig } from '../components/services/api'
+
+// Mock data for now - will be replaced with real API calls
+const mockConfig = {
+  enabled: true,
+  username: 'recapitul8r',
+  hashtag: 'hey',
+  maxResponseLength: 280,
+  responseDelay: 1000,
+  whitelistEnabled: false,
+  whitelistMode: 'allow' as const,
+  maxRepliesPerHour: 50,
+  maxRepliesPerDay: 500,
+  logLevel: 'info' as const,
+  logRetentionDays: 7,
+  autoReply: true,
+  includeContext: true,
+  includeHashtags: true
+}
 
 export default function Dashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [config, setConfig] = useState<BotConfig | null>(null)
-  const [status, setStatus] = useState<any>(null)
+  const [config, setConfig] = useState(mockConfig)
 
   // Simple password check - in production, this would be server-side
   const handleLogin = (password: string) => {
@@ -30,79 +46,26 @@ export default function Dashboard() {
     setError('')
   }
 
-  // Load initial data
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadData()
-    }
-  }, [isAuthenticated])
-
-  const loadData = async () => {
-    try {
-      const [configResponse, statusResponse] = await Promise.all([
-        apiService.getConfig(),
-        apiService.getStatus()
-      ])
-
-      if (configResponse.success && configResponse.data) {
-        setConfig(configResponse.data.config)
-      }
-
-      if (statusResponse.success && statusResponse.data) {
-        setStatus(statusResponse.data)
-      }
-    } catch (error: any) {
-      console.error('Error loading data:', error)
-    }
-  }
-
-  const handleSaveConfig = async (newConfig: Partial<BotConfig>) => {
+  const handleSaveConfig = async (newConfig: any) => {
     setLoading(true)
     
-    try {
-      const response = await apiService.updateConfig(newConfig)
-      
-      if (response.success) {
-        // Reload config to get updated data
-        await loadData()
-      } else {
-        setError(response.error || 'Failed to save configuration')
-      }
-    } catch (error: any) {
-      setError(error.message || 'Failed to save configuration')
-    } finally {
-      setLoading(false)
-    }
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    setConfig(newConfig)
+    setLoading(false)
+    
+    // In production, this would call the actual API
+    console.log('Saving config:', newConfig)
   }
 
   if (!isAuthenticated) {
     return <LoginForm onLogin={handleLogin} error={error} />
   }
 
-  if (!config) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-2xl font-semibold text-gray-900 mb-2">Loading...</div>
-          <div className="text-sm text-gray-600">Please wait while we load your configuration</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <DashboardLayout onLogout={handleLogout}>
       <div className="space-y-6">
-        {/* Error Display */}
-        {error && (
-          <div className="material-card bg-red-50 border-red-200">
-            <div className="text-red-800">
-              <div className="font-medium">Error</div>
-              <div className="text-sm">{error}</div>
-            </div>
-          </div>
-        )}
-
         {/* Overview Section */}
         <div className="material-card">
           <h2 className="text-title mb-4">Bot Overview</h2>

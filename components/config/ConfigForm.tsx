@@ -2,249 +2,128 @@
 
 import { useState } from 'react'
 
-import { BotConfig } from '../services/api'
-
 interface ConfigFormProps {
-  config: BotConfig
-  onSave: (config: Partial<BotConfig>) => void
-  loading?: boolean
+  config: any
+  onSave: (config: any) => void
+  loading: boolean
 }
 
 export default function ConfigForm({ config, onSave, loading }: ConfigFormProps) {
-  const [formData, setFormData] = useState<BotConfig>(config)
+  const [localConfig, setLocalConfig] = useState(config)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(formData)
+    onSave(localConfig)
   }
 
-  const handleToggle = (field: keyof BotConfig) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }))
-  }
-
-  const handleChange = (field: keyof BotConfig, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+  const handleChange = (key: string, value: any) => {
+    setLocalConfig((prev: any) => ({ ...prev, [key]: value }))
   }
 
   return (
     <div className="material-card">
-      <h2 className="text-title mb-6">Bot Configuration</h2>
-      
+      <h2 className="text-title mb-4">Bot Configuration</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Core Settings */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Core Settings</h3>
-          
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="text-body font-medium">Bot Enabled</label>
-              <p className="text-caption">Enable or disable the bot</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleToggle('enabled')}
-              className={`switch ${formData.enabled ? 'switch-enabled' : 'switch-disabled'}`}
-            >
-              <span className={`switch-thumb ${formData.enabled ? 'switch-thumb-enabled' : 'switch-thumb-disabled'}`} />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-body font-medium mb-2">Username</label>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => handleChange('username', e.target.value)}
-                className="input-field"
-                placeholder="@username"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-body font-medium mb-2">Hashtag</label>
-              <input
-                type="text"
-                value={formData.hashtag}
-                onChange={(e) => handleChange('hashtag', e.target.value)}
-                className="input-field"
-                placeholder="#hey"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Response Settings */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Response Settings</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-body font-medium mb-2">Max Response Length</label>
-              <input
-                type="number"
-                min="1"
-                max="280"
-                value={formData.maxResponseLength}
-                onChange={(e) => handleChange('maxResponseLength', parseInt(e.target.value))}
-                className="input-field"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-body font-medium mb-2">Response Delay (ms)</label>
-              <input
-                type="number"
-                min="0"
-                max="60000"
-                value={formData.responseDelay}
-                onChange={(e) => handleChange('responseDelay', parseInt(e.target.value))}
-                className="input-field"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-body font-medium">Auto Reply</label>
-                <p className="text-caption">Automatically reply to mentions</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggle('autoReply')}
-                className={`switch ${formData.autoReply ? 'switch-enabled' : 'switch-disabled'}`}
-              >
-                <span className={`switch-thumb ${formData.autoReply ? 'switch-thumb-enabled' : 'switch-thumb-disabled'}`} />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-body font-medium">Include Context</label>
-                <p className="text-caption">Include tweet context in responses</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggle('includeContext')}
-                className={`switch ${formData.includeContext ? 'switch-enabled' : 'switch-disabled'}`}
-              >
-                <span className={`switch-thumb ${formData.includeContext ? 'switch-thumb-enabled' : 'switch-thumb-disabled'}`} />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-body font-medium">Include Hashtags</label>
-                <p className="text-caption">Include hashtags in responses</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggle('includeHashtags')}
-                className={`switch ${formData.includeHashtags ? 'switch-enabled' : 'switch-disabled'}`}
-              >
-                <span className={`switch-thumb ${formData.includeHashtags ? 'switch-thumb-enabled' : 'switch-thumb-disabled'}`} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Rate Limiting */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Rate Limiting</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-body font-medium mb-2">Max Replies per Hour</label>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={formData.maxRepliesPerHour}
-                onChange={(e) => handleChange('maxRepliesPerHour', parseInt(e.target.value))}
-                className="input-field"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-body font-medium mb-2">Max Replies per Day</label>
-              <input
-                type="number"
-                min="1"
-                max="1000"
-                value={formData.maxRepliesPerDay}
-                onChange={(e) => handleChange('maxRepliesPerDay', parseInt(e.target.value))}
-                className="input-field"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Whitelist Settings */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Whitelist Settings</h3>
-          
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="text-body font-medium">Whitelist Enabled</label>
-              <p className="text-caption">Enable user whitelist</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleToggle('whitelistEnabled')}
-              className={`switch ${formData.whitelistEnabled ? 'switch-enabled' : 'switch-disabled'}`}
-            >
-              <span className={`switch-thumb ${formData.whitelistEnabled ? 'switch-thumb-enabled' : 'switch-thumb-disabled'}`} />
-            </button>
+        {/* Basic Settings */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bot Enabled
+            </label>
+            <input
+              type="checkbox"
+              checked={localConfig.enabled}
+              onChange={(e) => handleChange('enabled', e.target.checked)}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
           </div>
 
           <div>
-            <label className="block text-body font-medium mb-2">Whitelist Mode</label>
-            <select
-              value={formData.whitelistMode}
-              onChange={(e) => handleChange('whitelistMode', e.target.value as 'allow' | 'deny')}
-              className="input-field"
-            >
-              <option value="allow">Allow only whitelisted users</option>
-              <option value="deny">Block whitelisted users</option>
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Username
+            </label>
+            <input
+              type="text"
+              value={localConfig.username}
+              onChange={(e) => handleChange('username', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Hashtag
+            </label>
+            <input
+              type="text"
+              value={localConfig.hashtag}
+              onChange={(e) => handleChange('hashtag', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Max Response Length
+            </label>
+            <input
+              type="number"
+              value={localConfig.maxResponseLength}
+              onChange={(e) => handleChange('maxResponseLength', parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            />
           </div>
         </div>
 
-        {/* Logging */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Logging</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Advanced Settings */}
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Advanced Settings</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-body font-medium mb-2">Log Level</label>
-              <select
-                value={formData.logLevel}
-                onChange={(e) => handleChange('logLevel', e.target.value as any)}
-                className="input-field"
-              >
-                <option value="error">Error</option>
-                <option value="warn">Warning</option>
-                <option value="info">Info</option>
-                <option value="debug">Debug</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-body font-medium mb-2">Log Retention (days)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Whitelist Enabled
+              </label>
               <input
-                type="number"
-                min="1"
-                max="365"
-                value={formData.logRetentionDays}
-                onChange={(e) => handleChange('logRetentionDays', parseInt(e.target.value))}
-                className="input-field"
+                type="checkbox"
+                checked={localConfig.whitelistEnabled}
+                onChange={(e) => handleChange('whitelistEnabled', e.target.checked)}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Auto Reply
+              </label>
+              <input
+                type="checkbox"
+                checked={localConfig.autoReply}
+                onChange={(e) => handleChange('autoReply', e.target.checked)}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Include Context
+              </label>
+              <input
+                type="checkbox"
+                checked={localConfig.includeContext}
+                onChange={(e) => handleChange('includeContext', e.target.checked)}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Include Hashtags
+              </label>
+              <input
+                type="checkbox"
+                checked={localConfig.includeHashtags}
+                onChange={(e) => handleChange('includeHashtags', e.target.checked)}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
               />
             </div>
           </div>
@@ -255,7 +134,7 @@ export default function ConfigForm({ config, onSave, loading }: ConfigFormProps)
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary"
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md font-medium"
           >
             {loading ? 'Saving...' : 'Save Configuration'}
           </button>
