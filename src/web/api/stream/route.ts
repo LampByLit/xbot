@@ -5,10 +5,12 @@ import { botLogger } from '@/bot/utils/logger'
 export async function GET() {
   try {
     const status = streamHandler.getStatus()
+    const retryInfo = streamHandler.getRetryInfo()
     
     return NextResponse.json({
       success: true,
-      status
+      status,
+      retryInfo
     })
   } catch (error: any) {
     botLogger.error('Stream API GET error', error)

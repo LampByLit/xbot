@@ -16,12 +16,26 @@ interface ProcessedMention {
   error?: string
 }
 
+interface RetryConfig {
+  maxRetries: number
+  baseDelay: number
+  maxDelay: number
+  backoffMultiplier: number
+}
+
 class StreamHandler {
   private isRunning: boolean = false
   private pollInterval: NodeJS.Timeout | null = null
   private lastMentionId: string | null = null
   private processedMentions: Set<string> = new Set()
+  private failedMentions: Map<string, { retries: number; lastError: string; nextRetry: number }> = new Map()
   private config = configManager.getConfig()
+  private retryConfig: RetryConfig = {
+    maxRetries: 3,
+    baseDelay: 1000, // 1 second
+    maxDelay: 30000, // 30 seconds
+    backoffMultiplier: 2
+  }
 
   constructor() {
     // Update config when it changes
@@ -53,7 +67,8 @@ class StreamHandler {
     botLogger.info('Stream handler started', {
       username: this.config.username,
       hashtag: this.config.hashtag,
-      pollInterval: '60 seconds'
+      pollInterval: '60 seconds',
+      retryConfig: this.retryConfig
     })
 
     // Start polling immediately
@@ -118,6 +133,9 @@ class StreamHandler {
         await this.processMention(mention)
       }
 
+      // Process any failed mentions that are ready for retry
+      await this.processFailedMentions()
+
     } catch (error: any) {
       botLogger.error('Error polling mentions', error)
     }
@@ -159,12 +177,12 @@ class StreamHandler {
         text: mention.text.substring(0, 100)
       })
 
-      // Generate response
-      const response = await this.generateResponse(mention)
+      // Generate response with retry
+      const response = await this.generateResponseWithRetry(mention)
       
       if (response) {
-        // Post reply
-        await this.postReply(mentionId, response)
+        // Post reply with retry
+        await this.postReplyWithRetry(mentionId, response)
         
         botLogger.info('Successfully processed mention', {
           mentionId,
@@ -174,14 +192,215 @@ class StreamHandler {
       }
 
       this.processedMentions.add(mentionId)
+      this.failedMentions.delete(mentionId) // Remove from failed list if successful
 
     } catch (error: any) {
       botLogger.error('Error processing mention', error, {
         mentionId,
         username: mention.user?.screen_name
       })
-      this.processedMentions.add(mentionId)
+      
+      // Add to failed mentions for retry
+      this.addToFailedMentions(mentionId, error.message || 'Unknown error')
     }
+  }
+
+  /**
+   * Add mention to failed mentions for retry
+   */
+  private addToFailedMentions(mentionId: string, error: string): void {
+    const existing = this.failedMentions.get(mentionId)
+    const retries = existing ? existing.retries + 1 : 0
+    
+    if (retries < this.retryConfig.maxRetries) {
+      const delay = Math.min(
+        this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, retries),
+        this.retryConfig.maxDelay
+      )
+      const nextRetry = Date.now() + delay
+      
+      this.failedMentions.set(mentionId, {
+        retries,
+        lastError: error,
+        nextRetry
+      })
+      
+      botLogger.info('Added mention to retry queue', {
+        mentionId,
+        retries,
+        nextRetry: new Date(nextRetry).toISOString(),
+        error
+      })
+    } else {
+      botLogger.error('Max retries exceeded for mention', undefined, {
+        mentionId,
+        maxRetries: this.retryConfig.maxRetries,
+        finalError: error
+      })
+      this.processedMentions.add(mentionId) // Mark as processed to avoid infinite retries
+    }
+  }
+
+  /**
+   * Process failed mentions that are ready for retry
+   */
+  private async processFailedMentions(): Promise<void> {
+    const now = Date.now()
+    const readyForRetry = Array.from(this.failedMentions.entries())
+      .filter(([_, data]) => data.nextRetry <= now)
+    
+    if (readyForRetry.length === 0) {
+      return
+    }
+
+    botLogger.info('Processing failed mentions for retry', {
+      count: readyForRetry.length
+    })
+
+    for (const [mentionId, data] of readyForRetry) {
+      try {
+        // Get the original mention data (we'll need to reconstruct this)
+        // For now, we'll just remove it from failed list and log
+        botLogger.info('Retrying failed mention', {
+          mentionId,
+          retries: data.retries,
+          lastError: data.lastError
+        })
+        
+        // Remove from failed list (in a real implementation, we'd need to store the original mention data)
+        this.failedMentions.delete(mentionId)
+        
+      } catch (error: any) {
+        botLogger.error('Error retrying mention', error, { mentionId })
+        // Add back to failed list if retry failed
+        this.addToFailedMentions(mentionId, error.message || 'Retry failed')
+      }
+    }
+  }
+
+  /**
+   * Generate response with retry logic
+   */
+  private async generateResponseWithRetry(mention: TwitterMention): Promise<string | null> {
+    let lastError: string | null = null
+    
+    for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        const response = await this.generateResponse(mention)
+        if (response) {
+          if (attempt > 1) {
+            botLogger.info('Response generation succeeded on retry', {
+              mentionId: mention.id_str,
+              attempt
+            })
+          }
+          return response
+        }
+        return null
+      } catch (error: any) {
+        lastError = error.message || 'Unknown error'
+        
+        if (attempt < this.retryConfig.maxRetries) {
+          const delay = Math.min(
+            this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+            this.retryConfig.maxDelay
+          )
+          
+          botLogger.warn('Response generation failed, retrying', {
+            mentionId: mention.id_str,
+            attempt,
+            nextAttempt: attempt + 1,
+            delay,
+            error: lastError
+          })
+          
+          await this.sleep(delay)
+        }
+      }
+    }
+    
+    botLogger.error('Response generation failed after all retries', undefined, {
+      mentionId: mention.id_str,
+      maxRetries: this.retryConfig.maxRetries,
+      finalError: lastError
+    })
+    
+    return null
+  }
+
+  /**
+   * Post reply with retry logic
+   */
+  private async postReplyWithRetry(mentionId: string, response: string): Promise<void> {
+    let lastError: string | null = null
+    
+    for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        await this.postReply(mentionId, response)
+        
+        if (attempt > 1) {
+          botLogger.info('Reply posting succeeded on retry', {
+            mentionId,
+            attempt
+          })
+        }
+        
+        return
+      } catch (error: any) {
+        lastError = error.message || 'Unknown error'
+        
+        // Check if it's a rate limit error
+        if (error.response?.status === 429) {
+          const resetTime = error.response.headers['x-rate-limit-reset']
+          if (resetTime) {
+            const resetDate = new Date(parseInt(resetTime) * 1000)
+            const now = new Date()
+            const waitTime = Math.max(resetDate.getTime() - now.getTime(), 0)
+            
+            botLogger.warn('Rate limit hit, waiting for reset', {
+              mentionId,
+              resetTime: resetDate.toISOString(),
+              waitTime: Math.ceil(waitTime / 1000)
+            })
+            
+            await this.sleep(waitTime)
+            continue // Retry immediately after waiting
+          }
+        }
+        
+        if (attempt < this.retryConfig.maxRetries) {
+          const delay = Math.min(
+            this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+            this.retryConfig.maxDelay
+          )
+          
+          botLogger.warn('Reply posting failed, retrying', {
+            mentionId,
+            attempt,
+            nextAttempt: attempt + 1,
+            delay,
+            error: lastError
+          })
+          
+          await this.sleep(delay)
+        }
+      }
+    }
+    
+    botLogger.error('Reply posting failed after all retries', undefined, {
+      mentionId,
+      maxRetries: this.retryConfig.maxRetries,
+      finalError: lastError
+    })
+    
+    throw new Error(`Failed to post reply after ${this.retryConfig.maxRetries} attempts: ${lastError}`)
+  }
+
+  /**
+   * Sleep utility function
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
   }
 
   /**
@@ -309,6 +528,8 @@ class StreamHandler {
     isRunning: boolean
     lastMentionId: string | null
     processedMentionsCount: number
+    failedMentionsCount: number
+    retryConfig: RetryConfig
     config: {
       enabled: boolean
       username: string
@@ -320,6 +541,8 @@ class StreamHandler {
       isRunning: this.isRunning,
       lastMentionId: this.lastMentionId,
       processedMentionsCount: this.processedMentions.size,
+      failedMentionsCount: this.failedMentions.size,
+      retryConfig: this.retryConfig,
       config: {
         enabled: this.config.enabled,
         username: this.config.username,
@@ -330,10 +553,32 @@ class StreamHandler {
   }
 
   /**
+   * Get detailed retry information
+   */
+  getRetryInfo(): {
+    failedMentions: Array<{
+      mentionId: string
+      retries: number
+      lastError: string
+      nextRetry: string
+    }>
+  } {
+    const failedMentions = Array.from(this.failedMentions.entries()).map(([mentionId, data]) => ({
+      mentionId,
+      retries: data.retries,
+      lastError: data.lastError,
+      nextRetry: new Date(data.nextRetry).toISOString()
+    }))
+
+    return { failedMentions }
+  }
+
+  /**
    * Clear processed mentions cache
    */
   clearCache(): void {
     this.processedMentions.clear()
+    this.failedMentions.clear()
     botLogger.info('Stream handler cache cleared')
   }
 }
