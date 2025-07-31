@@ -68,7 +68,7 @@ class TwitterClient {
     if (!this.config) {
       this.config = {
         apiKey: getRequiredEnvVar('X_API_KEY'),
-        apiSecret: getRequiredEnvVar('X_API_KEY_SECRET'),
+        apiSecret: getRequiredEnvVar('X_API_SECRET'),
         accessToken: getRequiredEnvVar('X_ACCESS_TOKEN'),
         accessTokenSecret: getRequiredEnvVar('X_ACCESS_TOKEN_SECRET'),
         bearerToken: getRequiredEnvVar('X_BEARER_TOKEN')
