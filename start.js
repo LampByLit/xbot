@@ -250,7 +250,7 @@ const webProcess = spawn('node', ['node_modules/.bin/next', 'start'], {
 });
 
 // Start comprehensive testing after delay
-setTimeout(() => {
+setTimeout(async () => {
   log('🧪 Starting comprehensive tests...');
   
   // Run all tests
