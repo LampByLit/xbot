@@ -40,10 +40,36 @@ setTimeout(() => {
   }
   console.log(`Bot file found: ${botPath}`);
 
-  const botProcess = spawn('node', [botPath], {
+  // Run simple test first
+  console.log('🧪 Running simple bot test...');
+  const testProcess = spawn('node', ['simple-test.js'], {
     stdio: ['inherit', 'pipe', 'pipe'],
     shell: false,
     env: { ...process.env, NODE_ENV: 'production' }
+  });
+
+  testProcess.stdout.on('data', (data) => {
+    console.log(`Test stdout: ${data.toString()}`);
+  });
+
+  testProcess.stderr.on('data', (data) => {
+    console.error(`Test stderr: ${data.toString()}`);
+  });
+
+  testProcess.on('exit', (code) => {
+    console.log(`Test process exited with code ${code}`);
+    
+    if (code === 0) {
+      console.log('✅ Simple test passed, starting bot...');
+      
+      const botProcess = spawn('node', [botPath], {
+        stdio: ['inherit', 'pipe', 'pipe'],
+        shell: false,
+        env: { ...process.env, NODE_ENV: 'production' }
+        });
+    } else {
+      console.error('❌ Simple test failed, not starting bot');
+    }
   });
 
   botProcess.stdout.on('data', (data) => {
