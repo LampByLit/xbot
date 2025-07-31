@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "build": "next build && npm run bot:build",
+    "start": "node start.js",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "bot:dev": "tsx src/bot/index.ts",
