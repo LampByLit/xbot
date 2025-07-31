@@ -200,7 +200,12 @@ class TwitterClient {
         
         // Cache the user ID
         const userId = response.data.data.id
-        stateManager.setUserId(userId)
+        if (userId) {
+          stateManager.setUserId(userId)
+        } else {
+          botLogger.error('Twitter API returned null user ID')
+          return { success: false, error: 'Invalid user ID from Twitter API' }
+        }
         
         botLogger.info('Twitter API connection test successful', { userId })
         return { success: true }
@@ -317,7 +322,11 @@ class TwitterClient {
           `${API_ENDPOINTS.TWITTER.BASE_URL}/users/me`
         )
         userId = userResponse.data.data.id
-        stateManager.setUserId(userId)
+        if (userId) {
+          stateManager.setUserId(userId)
+        } else {
+          throw new Error('Failed to get user ID from Twitter API')
+        }
       }
 
       // Use persistent lastMentionId if no sinceId provided
