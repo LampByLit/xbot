@@ -3,18 +3,18 @@ const path = require('path');
 
 console.log('🚀 Starting XBot on Railway...');
 
-// Start the web interface
-const webProcess = spawn('npm', ['run', 'start'], {
+// Start the web interface (Next.js)
+const webProcess = spawn('node', ['node_modules/.bin/next', 'start'], {
   stdio: 'inherit',
-  shell: true
+  shell: false
 });
 
 // Start the bot after a short delay
 setTimeout(() => {
   console.log('🤖 Starting bot...');
-  const botProcess = spawn('npm', ['run', 'bot:start'], {
+  const botProcess = spawn('node', ['dist/bot/index.js'], {
     stdio: 'inherit',
-    shell: true
+    shell: false
   });
 
   botProcess.on('error', (error) => {
