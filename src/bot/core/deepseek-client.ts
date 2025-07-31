@@ -25,52 +25,65 @@ interface DeepSeekClientConfig {
 }
 
 class DeepSeekClient {
-  private config: DeepSeekConfig
-  private axiosInstance: AxiosInstance
+  private config: DeepSeekConfig | null = null
+  private axiosInstance: AxiosInstance | null = null
   private isConnected: boolean = false
 
   constructor() {
-    this.config = {
-      apiKey: getRequiredEnvVar('DEEPSEEK_API_KEY'),
-      apiUrl: getRequiredEnvVar('DEEPSEEK_API_URL'),
-      model: 'deepseek-chat',
-      maxTokens: 1000,
-      temperature: 0.7,
-      topP: 0.9,
-      presencePenalty: 0.0,
-      frequencyPenalty: 0.0
+    // Initialize lazily to avoid environment variable access at import time
+  }
+
+  private getConfig(): DeepSeekConfig {
+    if (!this.config) {
+      this.config = {
+        apiKey: getRequiredEnvVar('DEEPSEEK_API_KEY'),
+        apiUrl: getRequiredEnvVar('DEEPSEEK_API_URL'),
+        model: getRequiredEnvVar('DEEPSEEK_MODEL'),
+        maxTokens: 1000,
+        temperature: 0.7,
+        topP: 0.9,
+        presencePenalty: 0.0,
+        frequencyPenalty: 0.0
+      }
     }
+    return this.config
+  }
 
-    this.axiosInstance = axios.create({
-      baseURL: this.config.apiUrl,
-      timeout: 60000, // 60 seconds for AI responses
-      headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'XBot/1.0.0'
-      }
-    })
+  private getAxiosInstance(): AxiosInstance {
+    if (!this.axiosInstance) {
+      const config = this.getConfig()
+      this.axiosInstance = axios.create({
+        baseURL: config.apiUrl,
+        timeout: 60000, // 60 seconds for AI responses
+        headers: {
+          'Authorization': `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'XBot/1.0.0'
+        }
+      })
 
-    // Add response interceptor for logging
-    this.axiosInstance.interceptors.response.use(
-      (response) => {
-        botLogger.apiResponse('deepseek', response.config.url || '', response.status, {
-          method: response.config.method,
-          model: response.data?.model,
-          usage: response.data?.usage
-        })
-        return response
-      },
-      (error) => {
-        botLogger.error('DeepSeek API Error', error, {
-          url: error.config?.url,
-          method: error.config?.method,
-          status: error.response?.status,
-          data: error.response?.data
-        })
-        return Promise.reject(error)
-      }
-    )
+      // Add response interceptor for logging
+      this.axiosInstance.interceptors.response.use(
+        (response) => {
+          botLogger.apiResponse('deepseek', response.config.url || '', response.status, {
+            method: response.config.method,
+            model: response.data?.model,
+            usage: response.data?.usage
+          })
+          return response
+        },
+        (error) => {
+          botLogger.error('DeepSeek API Error', error, {
+            url: error.config?.url,
+            method: error.config?.method,
+            status: error.response?.status,
+            data: error.response?.data
+          })
+          return Promise.reject(error)
+        }
+      )
+    }
+    return this.axiosInstance
   }
 
   /**
@@ -79,7 +92,7 @@ class DeepSeekClient {
   async testConnection(): Promise<{ success: boolean; error?: string }> {
     try {
       const testRequest: DeepSeekChatRequest = {
-        model: this.config.model,
+        model: this.getConfig().model,
         messages: [
           { role: 'user', content: 'Hello' }
         ],
@@ -173,7 +186,8 @@ class DeepSeekClient {
    */
   private async makeRequest(request: DeepSeekChatRequest): Promise<DeepSeekChatResponse> {
     try {
-      const response: AxiosResponse<DeepSeekChatResponse> = await this.axiosInstance.post(
+      const axiosInstance = this.getAxiosInstance()
+      const response: AxiosResponse<DeepSeekChatResponse> = await axiosInstance.post(
         API_ENDPOINTS.DEEPSEEK.CHAT_COMPLETIONS,
         request
       )
@@ -282,28 +296,29 @@ User's message: ${message}
    * Update client configuration
    */
   updateConfig(newConfig: Partial<DeepSeekConfig>): void {
-    this.config = { ...this.config, ...newConfig }
+    this.config = { ...this.getConfig(), ...newConfig }
     botLogger.info('DeepSeek client configuration updated', { newConfig })
   }
 
   /**
    * Get current configuration
    */
-  getConfig(): DeepSeekConfig {
-    return { ...this.config }
+  getCurrentConfig(): DeepSeekConfig {
+    return this.getConfig()
   }
 
   /**
    * Check if client is connected
    */
   getConnectionStatus(): { connected: boolean; config: Partial<DeepSeekClientConfig> } {
+    const config = this.getConfig()
     return {
       connected: this.isConnected,
       config: {
-        apiUrl: this.config.apiUrl,
-        model: this.config.model,
-        maxTokens: this.config.maxTokens,
-        temperature: this.config.temperature
+        apiUrl: config.apiUrl,
+        model: config.model,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature
       }
     }
   }

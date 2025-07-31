@@ -27,86 +27,104 @@ interface TwitterClientConfig {
 }
 
 class TwitterClient {
-  private config: TwitterClientConfig
-  private oauth: OAuth
-  private axiosInstance: AxiosInstance
+  private config: TwitterClientConfig | null = null
+  private oauth: OAuth | null = null
+  private axiosInstance: AxiosInstance | null = null
   private isAuthenticated: boolean = false
 
   constructor() {
-    this.config = {
-      apiKey: getRequiredEnvVar('TWITTER_API_KEY'),
-      apiSecret: getRequiredEnvVar('TWITTER_API_SECRET'),
-      accessToken: getRequiredEnvVar('TWITTER_ACCESS_TOKEN'),
-      accessTokenSecret: getRequiredEnvVar('TWITTER_ACCESS_TOKEN_SECRET'),
-      bearerToken: getRequiredEnvVar('TWITTER_BEARER_TOKEN')
+    // Initialize lazily to avoid environment variable access at import time
+  }
+
+  private getConfig(): TwitterClientConfig {
+    if (!this.config) {
+      this.config = {
+        apiKey: getRequiredEnvVar('X_API_KEY'),
+        apiSecret: getRequiredEnvVar('X_API_KEY_SECRET'),
+        accessToken: getRequiredEnvVar('X_ACCESS_TOKEN'),
+        accessTokenSecret: getRequiredEnvVar('X_ACCESS_TOKEN_SECRET'),
+        bearerToken: getRequiredEnvVar('X_BEARER_TOKEN')
+      }
     }
+    return this.config
+  }
 
-    this.oauth = new OAuth({
-      consumer: {
-        key: this.config.apiKey,
-        secret: this.config.apiSecret
-      },
-      signature_method: 'HMAC-SHA1',
-      hash_function(base_string, key) {
-        return crypto
-          .createHmac('sha1', key)
-          .update(base_string)
-          .digest('base64')
-      }
-    })
-
-    this.axiosInstance = axios.create({
-      timeout: 30000,
-      headers: {
-        'User-Agent': 'XBot/1.0.0'
-      }
-    })
-
-    // Add request interceptor for OAuth
-    this.axiosInstance.interceptors.request.use(
-      (config) => {
-        if (config.url && config.method && !config.url.includes('oauth')) {
-          const request_data = {
-            url: config.url,
-            method: config.method.toUpperCase()
-          }
-
-          const token = {
-            key: this.config.accessToken,
-            secret: this.config.accessTokenSecret
-          }
-
-          const authHeader = this.oauth.toHeader(this.oauth.authorize(request_data, token))
-          if (config.headers) {
-            Object.assign(config.headers, authHeader)
-          }
+  private getOAuth(): OAuth {
+    if (!this.oauth) {
+      const config = this.getConfig()
+      this.oauth = new OAuth({
+        consumer: {
+          key: config.apiKey,
+          secret: config.apiSecret
+        },
+        signature_method: 'HMAC-SHA1',
+        hash_function(base_string, key) {
+          return crypto
+            .createHmac('sha1', key)
+            .update(base_string)
+            .digest('base64')
         }
-        return config
-      },
-      (error) => {
-        return Promise.reject(error)
-      }
-    )
+      })
+    }
+    return this.oauth
+  }
 
-    // Add response interceptor for logging
-    this.axiosInstance.interceptors.response.use(
-      (response) => {
-        botLogger.apiResponse('twitter', response.config.url || '', response.status, {
-          method: response.config.method,
-          dataSize: JSON.stringify(response.data).length
-        })
-        return response
-      },
-      (error) => {
-        botLogger.error('Twitter API Error', error, {
-          url: error.config?.url,
-          method: error.config?.method,
-          status: error.response?.status,
-          data: error.response?.data
-        })
-        return Promise.reject(error)
-      }
-    )
+  private getAxiosInstance(): AxiosInstance {
+    if (!this.axiosInstance) {
+      this.axiosInstance = axios.create({
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'XBot/1.0.0'
+        }
+      })
+
+      // Add request interceptor for OAuth
+      this.axiosInstance.interceptors.request.use(
+        (config) => {
+          if (config.url && config.method && !config.url.includes('oauth')) {
+            const request_data = {
+              url: config.url,
+              method: config.method.toUpperCase()
+            }
+
+            const token = {
+              key: this.getConfig().accessToken,
+              secret: this.getConfig().accessTokenSecret
+            }
+
+            const authHeader = this.getOAuth().toHeader(this.getOAuth().authorize(request_data, token))
+            if (config.headers) {
+              Object.assign(config.headers, authHeader)
+            }
+          }
+          return config
+        },
+        (error) => {
+          return Promise.reject(error)
+        }
+      )
+
+      // Add response interceptor for logging
+      this.axiosInstance.interceptors.response.use(
+        (response) => {
+          botLogger.apiResponse('twitter', response.config.url || '', response.status, {
+            method: response.config.method,
+            dataSize: JSON.stringify(response.data).length
+          })
+          return response
+        },
+        (error) => {
+          botLogger.error('Twitter API Error', error, {
+            url: error.config?.url,
+            method: error.config?.method,
+            status: error.response?.status,
+            data: error.response?.data
+          })
+          return Promise.reject(error)
+        }
+      )
+    }
+    return this.axiosInstance
   }
 
   /**
@@ -138,7 +156,7 @@ class TwitterClient {
         inReplyTo: request.in_reply_to_status_id
       })
 
-      const response: AxiosResponse<TwitterPostResponse> = await this.axiosInstance.post(
+      const response: AxiosResponse<TwitterPostResponse> = await this.getAxiosInstance().post(
         `${API_ENDPOINTS.TWITTER.BASE_URL}/statuses/update.json`,
         request
       )
@@ -180,7 +198,7 @@ class TwitterClient {
 
       botLogger.apiRequest('twitter', 'statuses/mentions_timeline', { count, sinceId })
 
-      const response: AxiosResponse<TwitterMention[]> = await this.axiosInstance.get(
+      const response: AxiosResponse<TwitterMention[]> = await this.getAxiosInstance().get(
         `${API_ENDPOINTS.TWITTER.BASE_URL}/statuses/mentions_timeline.json`,
         { params }
       )
@@ -209,7 +227,7 @@ class TwitterClient {
         count: request.count
       })
 
-      const response: AxiosResponse<TwitterSearchResponse> = await this.axiosInstance.get(
+      const response: AxiosResponse<TwitterSearchResponse> = await this.getAxiosInstance().get(
         `${API_ENDPOINTS.TWITTER.BASE_URL}/search/tweets.json`,
         { params: request }
       )
@@ -233,7 +251,7 @@ class TwitterClient {
     try {
       botLogger.apiRequest('twitter', 'users/show', { username })
 
-      const response: AxiosResponse<TwitterUser> = await this.axiosInstance.get(
+      const response: AxiosResponse<TwitterUser> = await this.getAxiosInstance().get(
         `${API_ENDPOINTS.TWITTER.BASE_URL}/users/show.json`,
         { params: { screen_name: username } }
       )
@@ -252,7 +270,7 @@ class TwitterClient {
     try {
       botLogger.apiRequest('twitter', 'statuses/show', { tweetId })
 
-      const response: AxiosResponse<TwitterTweet> = await this.axiosInstance.get(
+      const response: AxiosResponse<TwitterTweet> = await this.getAxiosInstance().get(
         `${API_ENDPOINTS.TWITTER.BASE_URL}/statuses/show.json`,
         { params: { id: tweetId } }
       )
@@ -271,7 +289,7 @@ class TwitterClient {
     try {
       botLogger.apiRequest('twitter', 'statuses/user_timeline', { username, count })
 
-      const response: AxiosResponse<TwitterTweet[]> = await this.axiosInstance.get(
+      const response: AxiosResponse<TwitterTweet[]> = await this.getAxiosInstance().get(
         `${API_ENDPOINTS.TWITTER.BASE_URL}/statuses/user_timeline.json`,
         { params: { screen_name: username, count } }
       )
@@ -288,7 +306,7 @@ class TwitterClient {
    */
   async getRateLimitStatus(): Promise<Record<string, TwitterRateLimit>> {
     try {
-      const response: AxiosResponse<Record<string, TwitterRateLimit>> = await this.axiosInstance.get(
+      const response: AxiosResponse<Record<string, TwitterRateLimit>> = await this.getAxiosInstance().get(
         `${API_ENDPOINTS.TWITTER.BASE_URL}/application/rate_limit_status.json`
       )
 
@@ -351,11 +369,15 @@ class TwitterClient {
    * Get authentication status
    */
   getAuthStatus(): { authenticated: boolean; config: Partial<TwitterClientConfig> } {
+    const config = this.config || { apiKey: '', apiSecret: '', accessToken: '', accessTokenSecret: '', bearerToken: '' }
     return {
       authenticated: this.isAuthenticated,
       config: {
-        apiKey: this.config.apiKey ? '***' : undefined,
-        bearerToken: this.config.bearerToken ? '***' : undefined
+        apiKey: config.apiKey ? '***' + config.apiKey.slice(-4) : '',
+        apiSecret: config.apiSecret ? '***' + config.apiSecret.slice(-4) : '',
+        accessToken: config.accessToken ? '***' + config.accessToken.slice(-4) : '',
+        accessTokenSecret: config.accessTokenSecret ? '***' + config.accessTokenSecret.slice(-4) : '',
+        bearerToken: config.bearerToken ? '***' + config.bearerToken.slice(-4) : ''
       }
     }
   }
