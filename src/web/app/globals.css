@@ -1,0 +1,275 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Material Design-inspired custom properties */
+:root {
+  --md-primary: #1976d2;
+  --md-primary-dark: #1565c0;
+  --md-primary-light: #42a5f5;
+  --md-secondary: #dc004e;
+  --md-surface: #ffffff;
+  --md-surface-dark: #f5f5f5;
+  --md-text-primary: #212121;
+  --md-text-secondary: #757575;
+  --md-error: #d32f2f;
+  --md-success: #388e3c;
+  --md-warning: #f57c00;
+  --md-info: #0288d1;
+  --md-elevation-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+  --md-elevation-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+  --md-elevation-3: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+  --md-elevation-4: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+  --md-elevation-5: 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22);
+}
+
+/* Base styles */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Material Design components */
+@layer components {
+  /* Card component */
+  .md-card {
+    @apply bg-white rounded-lg shadow-md border border-gray-200;
+    box-shadow: var(--md-elevation-1);
+    transition: box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  
+  .md-card:hover {
+    box-shadow: var(--md-elevation-2);
+  }
+  
+  .md-card-elevated {
+    box-shadow: var(--md-elevation-3);
+  }
+  
+  /* Button components */
+  .md-button {
+    @apply px-6 py-2 rounded-md font-medium transition-all duration-200 
+           focus:outline-none focus:ring-2 focus:ring-offset-2 
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .md-button-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+  }
+  
+  .md-button-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+  }
+  
+  .md-button-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+  
+  .md-button-success {
+    @apply bg-green-600 text-white hover:bg-green-700 focus:ring-green-500;
+  }
+  
+  /* Input components */
+  .md-input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-md 
+           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+           transition-colors duration-200;
+  }
+  
+  .md-input-error {
+    @apply border-red-500 focus:ring-red-500 focus:border-red-500;
+  }
+  
+  /* Switch component */
+  .md-switch {
+    @apply relative inline-flex h-6 w-11 items-center rounded-full 
+           transition-colors duration-200 focus:outline-none focus:ring-2 
+           focus:ring-blue-500 focus:ring-offset-2;
+  }
+  
+  .md-switch-track {
+    @apply inline-block h-6 w-11 rounded-full transition-colors duration-200;
+  }
+  
+  .md-switch-thumb {
+    @apply inline-block h-5 w-5 rounded-full bg-white shadow-md 
+           transform transition-transform duration-200;
+  }
+  
+  .md-switch-checked .md-switch-track {
+    @apply bg-blue-600;
+  }
+  
+  .md-switch-checked .md-switch-thumb {
+    @apply translate-x-5;
+  }
+  
+  .md-switch-unchecked .md-switch-track {
+    @apply bg-gray-300;
+  }
+  
+  .md-switch-unchecked .md-switch-thumb {
+    @apply translate-x-0;
+  }
+  
+  /* Chip component */
+  .md-chip {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .md-chip-primary {
+    @apply bg-blue-100 text-blue-800;
+  }
+  
+  .md-chip-success {
+    @apply bg-green-100 text-green-800;
+  }
+  
+  .md-chip-warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  
+  .md-chip-error {
+    @apply bg-red-100 text-red-800;
+  }
+  
+  /* Divider */
+  .md-divider {
+    @apply border-t border-gray-200 my-4;
+  }
+  
+  /* Paper component */
+  .md-paper {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200;
+  }
+  
+  .md-paper-elevated {
+    box-shadow: var(--md-elevation-2);
+  }
+  
+  /* Typography */
+  .md-headline {
+    @apply text-2xl font-bold text-gray-900;
+  }
+  
+  .md-title {
+    @apply text-xl font-semibold text-gray-900;
+  }
+  
+  .md-subtitle {
+    @apply text-lg font-medium text-gray-700;
+  }
+  
+  .md-body {
+    @apply text-base text-gray-600;
+  }
+  
+  .md-caption {
+    @apply text-sm text-gray-500;
+  }
+  
+  /* Status indicators */
+  .md-status {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .md-status-online {
+    @apply bg-green-100 text-green-800;
+  }
+  
+  .md-status-offline {
+    @apply bg-gray-100 text-gray-800;
+  }
+  
+  .md-status-error {
+    @apply bg-red-100 text-red-800;
+  }
+  
+  .md-status-warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  
+  /* Loading spinner */
+  .md-spinner {
+    @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
+  }
+  
+  /* Fade animations */
+  .md-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .md-fade-out {
+    animation: fadeOut 0.3s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(10px); }
+  }
+  
+  /* Slide animations */
+  .md-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
+  
+  /* Pulse animation for notifications */
+  .md-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* Focus styles */
+.focus-visible:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+}
+
+/* Selection styles */
+::selection {
+  @apply bg-blue-200 text-blue-900;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+} 
