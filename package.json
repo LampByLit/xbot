@@ -13,7 +13,8 @@
     "bot:start": "node dist/bot/index.js",
     "bot:build": "tsc --project tsconfig.bot.json",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "check-limits": "node check-rate-limits.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.0",

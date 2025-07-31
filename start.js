@@ -15,12 +15,22 @@ function log(message, type = 'info') {
 function checkEnvironment() {
   log('🔍 Checking environment variables...');
   const required = ['X_API_KEY', 'X_API_SECRET', 'X_ACCESS_TOKEN', 'X_ACCESS_TOKEN_SECRET', 'DEEPSEEK_API_KEY'];
+  const optional = ['X_USER_ID'];
   let missing = [];
   
   required.forEach(varName => {
     if (!process.env[varName]) {
       missing.push(varName);
       log(`${varName}: NOT SET`, 'error');
+    } else {
+      log(`${varName}: ${process.env[varName].substring(0, 10)}...`);
+    }
+  });
+  
+  // Check optional variables
+  optional.forEach(varName => {
+    if (!process.env[varName]) {
+      log(`${varName}: NOT SET (optional)`, 'warn');
     } else {
       log(`${varName}: ${process.env[varName].substring(0, 10)}...`);
     }

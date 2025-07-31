@@ -25,6 +25,7 @@ interface TwitterClientConfig {
   accessToken: string
   accessTokenSecret: string
   bearerToken: string
+  userId: string | null
 }
 
 class TwitterClient {
@@ -56,11 +57,13 @@ class TwitterClient {
     
     if (remaining !== undefined) {
       stateManager.updateApiCallsRemaining('twitter', parseInt(remaining))
+      botLogger.debug('Updated Twitter API calls remaining', { remaining })
     }
     
     if (reset) {
       const resetTime = new Date(parseInt(reset) * 1000).toISOString()
       stateManager.updateRateLimitReset('twitter', resetTime)
+      botLogger.debug('Updated Twitter rate limit reset time', { resetTime })
     }
   }
 
@@ -71,7 +74,8 @@ class TwitterClient {
         apiSecret: getRequiredEnvVar('X_API_SECRET'),
         accessToken: getRequiredEnvVar('X_ACCESS_TOKEN'),
         accessTokenSecret: getRequiredEnvVar('X_ACCESS_TOKEN_SECRET'),
-        bearerToken: getRequiredEnvVar('X_BEARER_TOKEN')
+        bearerToken: getRequiredEnvVar('X_BEARER_TOKEN'),
+        userId: process.env.X_USER_ID || null
       }
     }
     return this.config
@@ -177,10 +181,24 @@ class TwitterClient {
         return { success: false, error: 'Rate limit exceeded' }
       }
 
-      // Use cached user ID if available, otherwise get it
-      const cachedUserId = stateManager.getUserId()
-      if (cachedUserId) {
-        botLogger.info('Using cached user ID', { userId: cachedUserId })
+      // Use cached user ID if available
+      let userId = stateManager.getUserId()
+      
+      // If no cached user ID, try environment variable
+      if (!userId) {
+        const config = this.getConfig()
+        if (config.userId) {
+          userId = config.userId
+          stateManager.setUserId(userId)
+          botLogger.info('Using user ID from environment variable', { userId })
+          this.isAuthenticated = true
+          return { success: true }
+        }
+      }
+      
+      // If we have a cached user ID, use it
+      if (userId) {
+        botLogger.info('Using cached user ID', { userId })
         this.isAuthenticated = true
         return { success: true }
       }
@@ -316,6 +334,18 @@ class TwitterClient {
     try {
       // Use cached user ID if available
       let userId = stateManager.getUserId()
+      
+      // If no cached user ID, try environment variable
+      if (!userId) {
+        const config = this.getConfig()
+        if (config.userId) {
+          userId = config.userId
+          stateManager.setUserId(userId)
+          botLogger.info('Using user ID from environment variable', { userId })
+        }
+      }
+      
+      // If still no user ID, try to fetch from API
       if (!userId) {
         botLogger.info('No cached user ID, attempting to fetch from API')
         
@@ -527,7 +557,19 @@ class TwitterClient {
       // Handle rate limiting
       if (status === HTTP_STATUS.TOO_MANY_REQUESTS) {
         const resetTime = error.response.headers['x-rate-limit-reset']
-        botLogger.rateLimit('twitter', 0, new Date(parseInt(resetTime) * 1000).toISOString())
+        if (resetTime) {
+          const resetDate = new Date(parseInt(resetTime) * 1000).toISOString()
+          botLogger.rateLimit('twitter', 0, resetDate)
+          
+          // Update state manager with the reset time
+          stateManager.updateRateLimitReset('twitter', resetDate)
+          stateManager.updateApiCallsRemaining('twitter', 0)
+          
+          botLogger.info('Updated Twitter rate limit reset time', {
+            resetTime: resetDate,
+            currentTime: new Date().toISOString()
+          })
+        }
         return {
           code: status,
           message: 'Rate limit exceeded'
@@ -569,7 +611,7 @@ class TwitterClient {
    * Get authentication status
    */
   getAuthStatus(): { authenticated: boolean; config: Partial<TwitterClientConfig> } {
-    const config = this.config || { apiKey: '', apiSecret: '', accessToken: '', accessTokenSecret: '', bearerToken: '' }
+    const config = this.config || { apiKey: '', apiSecret: '', accessToken: '', accessTokenSecret: '', bearerToken: '', userId: null }
     return {
       authenticated: this.isAuthenticated,
       config: {
@@ -577,7 +619,8 @@ class TwitterClient {
         apiSecret: config.apiSecret ? '***' + config.apiSecret.slice(-4) : '',
         accessToken: config.accessToken ? '***' + config.accessToken.slice(-4) : '',
         accessTokenSecret: config.accessTokenSecret ? '***' + config.accessTokenSecret.slice(-4) : '',
-        bearerToken: config.bearerToken ? '***' + config.bearerToken.slice(-4) : ''
+        bearerToken: config.bearerToken ? '***' + config.bearerToken.slice(-4) : '',
+        userId: config.userId || null
       }
     }
   }
