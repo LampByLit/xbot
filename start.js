@@ -40,13 +40,34 @@ setTimeout(() => {
   }
   console.log(`Bot file found: ${botPath}`);
 
-  // Run simple test first
-  console.log('🧪 Running simple bot test...');
-  const testProcess = spawn('node', ['simple-test.js'], {
+  // Run environment test first
+  console.log('🔍 Running environment test...');
+  const envTestProcess = spawn('node', ['env-test.js'], {
     stdio: ['inherit', 'pipe', 'pipe'],
     shell: false,
     env: { ...process.env, NODE_ENV: 'production' }
   });
+
+  envTestProcess.stdout.on('data', (data) => {
+    console.log(`Env test stdout: ${data.toString()}`);
+  });
+
+  envTestProcess.stderr.on('data', (data) => {
+    console.error(`Env test stderr: ${data.toString()}`);
+  });
+
+  envTestProcess.on('exit', (code) => {
+    console.log(`Env test process exited with code ${code}`);
+    
+    if (code === 0) {
+      console.log('✅ Environment test passed, running simple bot test...');
+      
+      // Run simple test
+      const testProcess = spawn('node', ['simple-test.js'], {
+        stdio: ['inherit', 'pipe', 'pipe'],
+        shell: false,
+        env: { ...process.env, NODE_ENV: 'production' }
+      });
 
   testProcess.stdout.on('data', (data) => {
     console.log(`Test stdout: ${data.toString()}`);
@@ -59,34 +80,34 @@ setTimeout(() => {
   testProcess.on('exit', (code) => {
     console.log(`Test process exited with code ${code}`);
     
-    if (code === 0) {
-      console.log('✅ Simple test passed, starting bot...');
-      
-      const botProcess = spawn('node', [botPath], {
-        stdio: ['inherit', 'pipe', 'pipe'],
-        shell: false,
-        env: { ...process.env, NODE_ENV: 'production' }
-        });
-    } else {
-      console.error('❌ Simple test failed, not starting bot');
-    }
-  });
+         if (code === 0) {
+       console.log('✅ Simple test passed, starting bot...');
+       
+       const botProcess = spawn('node', [botPath], {
+         stdio: ['inherit', 'pipe', 'pipe'],
+         shell: false,
+         env: { ...process.env, NODE_ENV: 'production' }
+       });
 
-  botProcess.stdout.on('data', (data) => {
-    console.log(`Bot stdout: ${data.toString()}`);
-  });
+       botProcess.stdout.on('data', (data) => {
+         console.log(`Bot stdout: ${data.toString()}`);
+       });
 
-  botProcess.stderr.on('data', (data) => {
-    console.error(`Bot stderr: ${data.toString()}`);
-  });
+       botProcess.stderr.on('data', (data) => {
+         console.error(`Bot stderr: ${data.toString()}`);
+       });
 
-  botProcess.on('error', (error) => {
-    console.error('Bot process error:', error);
-  });
+       botProcess.on('error', (error) => {
+         console.error('Bot process error:', error);
+       });
 
-  botProcess.on('exit', (code) => {
-    console.log(`Bot process exited with code ${code}`);
-  });
+       botProcess.on('exit', (code) => {
+         console.log(`Bot process exited with code ${code}`);
+       });
+     } else {
+       console.error('❌ Simple test failed, not starting bot');
+     }
+   });
 }, 5000); // Wait 5 seconds for web interface to start
 
 webProcess.on('error', (error) => {
