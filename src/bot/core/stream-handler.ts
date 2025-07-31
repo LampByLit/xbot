@@ -271,6 +271,37 @@ class StreamHandler {
       startTime: this.startTime?.toISOString() || null
     }
   }
+
+  /**
+   * Get retry information
+   */
+  getRetryInfo(): {
+    lastRetry: string | null
+    retryCount: number
+    maxRetries: number
+    retryDelay: number
+  } {
+    return {
+      lastRetry: null, // Not implemented yet
+      retryCount: 0,
+      maxRetries: 3,
+      retryDelay: 5000 // 5 seconds
+    }
+  }
+
+  /**
+   * Clear stream handler cache
+   */
+  clearCache(): void {
+    this.mentionsProcessed = 0
+    this.errors = 0
+    this.lastPollTime = null
+    
+    // Note: Cannot clear lastMentionId as it expects a string
+    // The state manager will handle this appropriately
+    
+    botLogger.info('Stream handler cache cleared')
+  }
 }
 
 // Create singleton instance
