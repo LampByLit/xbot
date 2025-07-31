@@ -6,8 +6,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'XBot Dashboard',
-  description: 'Twitter bot management dashboard',
-  viewport: 'width=device-width, initial-scale=1',
+  description: 'Twitter Bot Management Interface',
 }
 
 export default function RootLayout({
@@ -16,9 +15,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${inter.className} h-full bg-gray-50 antialiased`}>
-        <div className="min-h-full">
+    <html lang="en">
+      <body className={inter.className}>
+        <div className="min-h-screen bg-gray-50">
           {children}
         </div>
       </body>
