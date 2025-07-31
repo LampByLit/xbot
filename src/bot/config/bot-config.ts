@@ -1,9 +1,9 @@
 import fs from 'fs'
 import path from 'path'
 import { z } from 'zod'
-import { PATHS } from '@/shared/constants'
+import { PATHS } from '../../shared/constants'
 import { botLogger } from '../utils/logger'
-import { safeJsonParse, safeJsonStringify } from '@/shared/utils'
+import { safeJsonParse, safeJsonStringify } from '../../shared/utils'
 
 // Configuration schemas
 const SystemPromptModuleSchema = z.object({

@@ -1,6 +1,6 @@
 import winston from 'winston'
 import path from 'path'
-import { PATHS, LOG_LEVELS } from '@/shared/constants'
+import { PATHS, LOG_LEVELS } from '../../shared/constants'
 
 // Custom log format
 const logFormat = winston.format.combine(

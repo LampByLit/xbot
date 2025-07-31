@@ -1,4 +1,4 @@
-import { RATE_LIMITS } from '@/shared/constants'
+import { RATE_LIMITS } from '../../shared/constants'
 import { botLogger } from './logger'
 
 interface RateLimitBucket {

@@ -13,10 +13,10 @@ import {
   TwitterError,
   TwitterRateLimit
 } from '../types/twitter-types'
-import { API_ENDPOINTS, HTTP_STATUS } from '@/shared/constants'
+import { API_ENDPOINTS, HTTP_STATUS } from '../../shared/constants'
 import { botLogger } from '../utils/logger'
 import { twitterRateLimiter } from '../utils/rate-limiter'
-import { getRequiredEnvVar } from '@/shared/utils'
+import { getRequiredEnvVar } from '../../shared/utils'
 
 interface TwitterClientConfig {
   apiKey: string

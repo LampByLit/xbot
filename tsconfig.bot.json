@@ -16,13 +16,14 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/bot/*": ["./src/bot/*"],
-      "@/web/*": ["./src/web/*"],
-      "@/shared/*": ["./src/shared/*"]
-    }
+      "baseUrl": ".",
+  "paths": {
+    "@/*": ["./src/*"],
+    "@/bot/*": ["./src/bot/*"],
+    "@/web/*": ["./src/web/*"],
+    "@/shared/*": ["./src/shared/*"]
+  },
+  "moduleResolution": "node"
   },
   "include": ["src/bot/**/*", "src/shared/**/*"],
   "exclude": ["node_modules", "dist", "src/web/**/*"]
