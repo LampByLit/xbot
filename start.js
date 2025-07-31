@@ -12,9 +12,37 @@ const webProcess = spawn('node', ['node_modules/.bin/next', 'start'], {
 // Start the bot after a short delay
 setTimeout(() => {
   console.log('🤖 Starting bot...');
+  
+  // Create data directory if it doesn't exist
+  const fs = require('fs');
+  const dataDir = '/data';
+  const logsDir = '/data/logs';
+  
+  try {
+    if (!fs.existsSync(dataDir)) {
+      console.log('Creating /data directory...');
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    if (!fs.existsSync(logsDir)) {
+      console.log('Creating /data/logs directory...');
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+    console.log('Data directories ready');
+  } catch (error) {
+    console.error('Error creating data directories:', error);
+  }
+  
   const botProcess = spawn('node', ['dist/bot/index.js'], {
-    stdio: 'inherit',
+    stdio: ['inherit', 'pipe', 'pipe'],
     shell: false
+  });
+
+  botProcess.stdout.on('data', (data) => {
+    console.log(`Bot stdout: ${data}`);
+  });
+
+  botProcess.stderr.on('data', (data) => {
+    console.error(`Bot stderr: ${data}`);
   });
 
   botProcess.on('error', (error) => {
